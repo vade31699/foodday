@@ -33,6 +33,8 @@ const migrationsPhp = read("api/migrations.php");
 const sql = read("fooday.sql");
 const htaccess = read(".htaccess");
 const webConfig = read("web.config");
+const composerJson = read("composer.json");
+const frontController = read("public/index.php");
 
 /* ---------- app.js in a sandbox, for the pure helpers ---------- */
 
@@ -261,4 +263,30 @@ test("the bundled server rules refuse to serve secrets and source data", () => {
   assert.match(webConfig, /<add segment="\.env"/, "IIS hides .env");
   assert.match(webConfig, /<add segment="tests"/, "IIS hides tests/");
   assert.match(webConfig, /directoryBrowse enabled="false"/, "IIS directory browsing is off");
+});
+
+test("a composer.json marks the app detectable by Laravel Cloud", () => {
+  const manifest = JSON.parse(composerJson);
+  assert.ok(manifest.require && manifest.require.php, "it declares a PHP requirement");
+  assert.ok(
+    !Object.keys(manifest.require).some(name => /^(laravel\/framework|symfony\/framework-bundle)$/.test(name)),
+    "without pulling in a framework this app does not use"
+  );
+});
+
+test("the public/ front controller serves only the app's public files", () => {
+  const start = frontController.indexOf("FOODAY_PUBLIC_FILES");
+  const allowList = frontController.slice(start, frontController.indexOf("];", start));
+
+  for (const file of ["index.html", "styles.css", "app.js", "fooday-logo.jpg"]) {
+    assert.ok(allowList.includes(`'${file}'`), `${file} is on the allow-list`);
+  }
+  for (const secret of [".env", "fooday.sql", "README", "tests"]) {
+    assert.ok(!allowList.includes(secret), `${secret} is not on the allow-list`);
+  }
+
+  assert.match(frontController, /preg_match\('#\^\/api\/\[a-z_\]\+\\\.php\$#'/, "only /api/<name>.php is routed");
+  assert.match(frontController, /readfile\(FOODAY_ROOT \. '\/' \. \$file\)/, "the served file comes from the allow-list");
+  assert.ok(!/readfile\([^)]*\$path/.test(frontController), "the request path is never streamed straight from disk");
+  assert.match(frontController, /http_response_code\(404\)/, "anything else is a 404");
 });

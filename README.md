@@ -114,20 +114,39 @@ so on that path keep it bound to `127.0.0.1` as the Setup step does, or move
 `.env` outside the folder with `FOODAY_ENV_FILE`.
 
 **Set the document root to this folder** (the one holding `index.html` and
-`api/`). If the host forces a `public/` document root, the whole project has to
-live under `public/`.
+`api/`). If the host serves a `public/` document root — Laravel Cloud does —
+use the bundled `public/index.php` front controller instead (below); it serves
+the same files without copying anything else into the web root.
 
-### A note on Laravel Cloud
+### Laravel Cloud
 
-Laravel Cloud is a managed platform for **Laravel** applications: it detects
-and boots a Laravel app (Composer, `artisan`, the framework HTTP kernel). This
-project is a framework-free PHP app, so it is not a drop-in fit for Laravel
-Cloud — the platform's build/boot pipeline expects the Laravel structure this
-codebase does not have. The deployment work that applies to any PHP host (the
-env-driven database, mail and session configuration above) is done, and the
-`public/` document-root note covers the usual cloud convention. Making it run
-*as a Laravel app* would mean porting the backend onto the framework, which is
-a separate project rather than a deployment flag.
+Laravel Cloud runs Laravel and Symfony, and also **other PHP backend
+applications** on its PHP runtime. It picks a runtime from marker files in the
+repository, so a framework-free app is detected as *PHP (Other PHP backend
+applications)* as soon as a `composer.json` is present — that is why the import
+screen previously stopped at *"We couldn't find a supported framework at the
+root"*. The `composer.json` in this repo declares no dependencies; it exists to
+be found.
+
+1. **Application directory:** the repository root.
+2. **Runtime:** PHP — choose 8.3 (8.2–8.5 are supported).
+3. **Build command:** `composer install --no-dev --no-interaction`. There is no
+   frontend build step, so delete any `npm run build` the dashboard pre-fills.
+4. **Deploy command:** leave it empty. Schema migrations run themselves on the
+   first request (`api/migrations.php`).
+5. **Database:** attach a Laravel MySQL resource. It injects `DB_HOST`,
+   `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` — the exact names
+   `api/config.php` already reads, so nothing has to be mapped.
+6. **Environment variables:** add the `MAIL_*` values and `MFA_PEPPER` from
+   `.env.example`. They are set on the process, and `env()` reads the process
+   environment before any file, so `.env` must not be deployed.
+7. **Document root:** the PHP runtime serves `public/`. That folder holds a
+   single `index.php` front controller which returns the five public files
+   (`index.html`, `styles.css`, `app.js`, `fooday-logo.jpg`, `api/*.php`) and
+   answers 404 for anything else. Because no other file is copied into the web
+   root, `fooday.sql`, `README.md`, `tests/` and any `.env` stay unreachable —
+   this replaces the `.htaccess` and `web.config` rules, which Laravel Cloud's
+   nginx does not read.
 
 ## Accounts
 
@@ -514,6 +533,9 @@ index.html        UI (all screens), loading styles.css and app.js with a ?v= cac
                   version
 styles.css        styles
 app.js            frontend logic (talks to api/*.php)
+composer.json     no dependencies; present so PHP hosts detect the application
+public/
+  index.php       front controller for a public/ document root (Laravel Cloud)
 fooday.sql        database schema (v9) + seed data. DESTRUCTIVE - see Setup
 api/
   config.php      PDO connection, session, settings, auth + order helpers

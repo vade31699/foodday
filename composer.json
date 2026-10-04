@@ -1,0 +1,13 @@
+{
+    "name": "fooday/fooday",
+    "description": "FOODAY — a framework-free PHP 8 + MySQL food-ordering web app.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.2"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
