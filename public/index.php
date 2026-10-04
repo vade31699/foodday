@@ -25,6 +25,13 @@ const FOODAY_PUBLIC_FILES = [
     '/styles.css'      => ['styles.css', 'text/css; charset=UTF-8'],
     '/app.js'          => ['app.js', 'text/javascript; charset=UTF-8'],
     '/fooday-logo.jpg' => ['fooday-logo.jpg', 'image/jpeg'],
+    // PWA / Trusted Web Activity assets (the Android app the manifest wraps).
+    '/manifest.webmanifest'      => ['manifest.webmanifest', 'application/manifest+json; charset=UTF-8'],
+    '/icons/icon-192.png'        => ['icons/icon-192.png', 'image/png'],
+    '/icons/icon-512.png'        => ['icons/icon-512.png', 'image/png'],
+    '/icons/maskable-512.png'    => ['icons/maskable-512.png', 'image/png'],
+    // Digital Asset Links: proves the APK may open this site without a URL bar.
+    '/.well-known/assetlinks.json' => ['.well-known/assetlinks.json', 'application/json'],
 ];
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
@@ -39,8 +46,13 @@ if (isset(FOODAY_PUBLIC_FILES[$path])) {
     [$file, $type] = FOODAY_PUBLIC_FILES[$path];
     header('Content-Type: ' . $type);
     // index.html is the app shell and points at version-stamped assets, so it
-    // must never be cached. The stamped assets themselves are safe to cache hard.
-    header('Cache-Control: ' . ($file === 'index.html'
+    // must never be cached. assetlinks.json must stay revalidatable too, or a
+    // signing-key change would not reach Chrome. manifest.webmanifest is the
+    // same kind of thing: it names the start URL, theme and icon paths, and
+    // Android caches it, so a year-long immutable copy would freeze the
+    // installed app on its first values. The stamped assets, and the icon
+    // files whose names change when the artwork does, are safe to cache hard.
+    header('Cache-Control: ' . (in_array($file, ['index.html', 'manifest.webmanifest', '.well-known/assetlinks.json'], true)
         ? 'no-cache, must-revalidate'
         : 'public, max-age=31536000, immutable'));
     readfile(FOODAY_ROOT . '/' . $file);

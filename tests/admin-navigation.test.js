@@ -359,6 +359,20 @@ test("a short window cannot scroll the page and carry the header away", () => {
   assert.ok(rule.includes("calc(100vh - 32px)"), "and it still leaves room for the 16px body padding");
 });
 
+test("the admin drawer is positioned against the phone frame, not the window", () => {
+  // As position:fixed the drawer escaped .app-viewport on a desktop, where the
+  // frame is a centred card: the scrim dimmed the whole window and the panel
+  // hung off the frame's right edge, over whatever sat beside it. Every other
+  // overlay in the app is absolute for exactly this reason.
+  const drawer = stylesCss.split("\n").find(line => line.startsWith(".admin-drawer{"));
+  assert.ok(drawer, "the drawer rule is still declared");
+  assert.match(drawer, /position:absolute/, "the drawer stays inside the frame");
+  assert.doesNotMatch(drawer, /position:fixed/, "it must never be measured against the window");
+
+  const frame = stylesCss.split("\n").find(line => line.startsWith(".app-viewport{"));
+  assert.match(frame, /position:relative/, "the frame is the containing block it is placed against");
+});
+
 test("the Back button is sized to sit beside the search box", () => {
   assert.match(stylesCss, /\.order-toolbar\{[^}]*display:flex/, "the toolbar lays the two out in a row");
   assert.match(stylesCss, /\.toolbar-back\{[^}]*height:41px/, "the button matches the search box's height");

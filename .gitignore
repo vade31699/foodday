@@ -1,6 +1,16 @@
 # Secrets — never commit these
 .env
 
+# Android / Bubblewrap: keep the signing key and build output out of git.
+# twa/twa-manifest.json IS tracked (it is the project definition).
+twa/*.keystore
+twa/keystore-credentials.txt
+twa/*.apk
+twa/*.aab
+twa/.gradle/
+twa/build/
+twa/app/build/
+
 # Local tooling
 node_modules/
 vendor/

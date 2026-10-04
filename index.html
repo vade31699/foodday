@@ -4,14 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FOODAY</title>
-<link rel="icon" type="image/jpeg" href="fooday-logo.jpg">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#95222D">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600;6..96,700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
 <!-- Bump the ?v= on styles.css and app.js in the same edit as either file: phones
      cache them hard, and a stale copy looks exactly like a bug that was never
      fixed. -->
-<link rel="stylesheet" href="styles.css?v=20261005">
+<link rel="stylesheet" href="styles.css?v=20261007">
 </head>
 <body>
 <div class="app-shell">
@@ -522,10 +525,18 @@
 <!-- CONFIRMATION CODE: changing an email or password always emails a one-time
      code to the address on file. One sheet serves both accounts and both kinds
      of change, so the wording and the retry path never drift apart. It is
-     declared last on purpose: modals share one z-index, so the one written last
-     paints on top, and this sheet always has to sit above the form that
-     opened it. -->
+     declared after every sheet that opens it: modals share one z-index, so the
+     one written last paints on top, and this sheet always has to sit above the
+     form that opened it. -->
 <div id="modal-change-code" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-change-code')">‹</button><h3 id="change-code-title">Confirm the Change</h3><span></span></div><div class="modal-body"><p id="change-code-text"></p><div class="form-stack"><label>Verification code</label><input id="change-code-input" class="input mfa-code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000"></div><button class="btn btn-primary" onclick="submitChangeCode()">Confirm</button><p class="mfa-pending-note">Didn't get it? <button onclick="resendChangeCode()">Send a new code</button></p><p class="modal-note" id="change-code-hint"></p></div></div></div>
+
+<!-- CONFIRM: one sheet serves every "are you sure?" in the app, so a Remove, a
+     Delete and a Replace all look the same and are answered the same way. It is
+     declared after every sheet that can open it: modals share one z-index, so
+     the one written last paints on top, and a confirmation always has to sit
+     above the form it was asked from. The wording and the button labels are
+     filled in by confirmDialog() before the sheet opens. -->
+<div id="modal-confirm" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="confirmDialogAnswer(false)" aria-label="Cancel">‹</button><h3 id="confirm-title">Please Confirm</h3><span></span></div><div class="modal-body"><p id="confirm-text"></p><div class="modal-actions"><button class="btn btn-ghost" id="confirm-cancel" onclick="confirmDialogAnswer(false)">Cancel</button><button class="btn btn-primary" id="confirm-ok" onclick="confirmDialogAnswer(true)">Confirm</button></div></div></div></div>
 
 <!-- CART TAB: docks to a screen edge, draggable to any height, on every customer screen -->
 <button id="cart-fab" class="cart-fab" type="button" data-edge="right" onclick="cartFabActivate(event)" aria-label="Open cart">
@@ -563,6 +574,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261005"></script>
+<script src="app.js?v=20261007"></script>
 </body>
 </html>

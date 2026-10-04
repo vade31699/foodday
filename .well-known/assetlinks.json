@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "cloud.laravel.foodday1.twa",
+      "sha256_cert_fingerprints": [
+        "8B:68:FB:95:E9:01:12:CB:88:3F:C1:62:AA:48:25:2D:E2:E6:D7:0F:AD:8F:0C:0E:BA:4F:66:9D:93:E3:4B:8F"
+      ]
+    }
+  }
+]

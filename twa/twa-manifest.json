@@ -1,0 +1,40 @@
+{
+  "packageId": "cloud.laravel.foodday1.twa",
+  "host": "foodday1.laravel.cloud",
+  "name": "FOODAY",
+  "launcherName": "FOODAY",
+  "display": "standalone",
+  "themeColor": "#95222D",
+  "themeColorDark": "#1C1416",
+  "navigationColor": "#95222D",
+  "navigationColorDark": "#1C1416",
+  "navigationDividerColor": "#95222D",
+  "navigationDividerColorDark": "#1C1416",
+  "backgroundColor": "#FFFDF9",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://foodday1.laravel.cloud/fooday-logo.jpg",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://foodday1.laravel.cloud/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

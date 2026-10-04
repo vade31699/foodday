@@ -182,7 +182,14 @@ button.payment-card{font:inherit;color:inherit;cursor:pointer;width:100%}
 .hamburger-btn{width:38px;height:38px;border:1px solid var(--line);background:#fff;border-radius:11px;display:grid;place-content:center;gap:4px;padding:0;box-shadow:var(--shadow)}
 .hamburger-btn span{display:block;width:17px;height:2px;border-radius:2px;background:var(--primary);transition:transform .22s ease,opacity .22s ease}
 .hamburger-btn:active span{transform:scaleX(.82)}
-.admin-drawer{position:fixed;inset:0;z-index:120;visibility:hidden;pointer-events:none}
+/* The admin drawer is one of the app's overlays, so it is positioned against
+   the phone frame like every other one (.modal, .bottom-nav, .cart-fab) and not
+   against the browser window. As position:fixed it escaped .app-viewport on a
+   desktop — where the frame is a centred card — so the scrim dimmed the whole
+   window and the panel hung past the right edge of the frame, over the content
+   beside it. On a phone the frame fills the window, which is why the bug only
+   ever showed on a PC. */
+.admin-drawer{position:absolute;inset:0;z-index:120;visibility:hidden;pointer-events:none}
 .admin-drawer.open{visibility:visible;pointer-events:auto}
 .drawer-scrim{position:absolute;inset:0;background:rgba(26,10,14,.45);opacity:0;transition:opacity .24s ease}
 .admin-drawer.open .drawer-scrim{opacity:1}

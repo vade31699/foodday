@@ -163,9 +163,11 @@ async function refreshStore() {
 
 function applyStore(data) { STORE = { ...EMPTY_STORE, ...data }; return STORE; }
 
-/** Shows the error, and sends the user back to sign-in if their session expired. */
+/** Shows the error in the app's own alert sheet, and sends the user back to
+ *  sign-in if their session expired. */
 function reportError(e) {
-  alert(e && e.message ? e.message : "Something went wrong. Please try again.");
+  const message = e && e.message ? e.message : "Something went wrong. Please try again.";
+  showAlert(message, e && e.unauthorized ? "Session Ended" : "Something Went Wrong");
   if (e && e.unauthorized) {
     refreshStore().then(() => navigateTo("screen-signin")).catch(() => {});
   }
@@ -276,6 +278,38 @@ function toast(title, message) {
 function showInfo(title, message) { document.getElementById("info-title").textContent = title; document.getElementById("info-body").textContent = message; openModal("modal-info"); }
 function openModal(id) { document.getElementById(id)?.classList.add("open"); }
 function closeModal(id) { document.getElementById(id)?.classList.remove("open"); }
+
+/* ---------- alert and confirmation dialogs ----------
+ * The browser's own alert and confirm panels are drawn by the operating system:
+ * they block the page, ignore FOODAY's colours, and on Android look enough like a
+ * system warning to be worth avoiding. Everything the app has to say, and every
+ * "are you sure?", goes through the app's own sheets instead.
+ */
+
+/** The alert sheet: one message and a single Done button. */
+function showAlert(message, title = "Please Check") { showInfo(title, message); }
+
+/* A confirmation is asynchronous: confirmDialog() resolves to true or false once
+ * the customer taps one of the two buttons, so callers always await it before
+ * acting. A second call replaces any still-pending one, which can only happen if
+ * a caller forgets its await. */
+let confirmAnswer = null;
+function confirmDialog({ title = "Please Confirm", message = "", confirmLabel = "Confirm", cancelLabel = "Cancel", danger = false } = {}) {
+  document.getElementById("confirm-title").textContent = title;
+  document.getElementById("confirm-text").textContent = message;
+  document.getElementById("confirm-cancel").textContent = cancelLabel;
+  const ok = document.getElementById("confirm-ok");
+  ok.textContent = confirmLabel;
+  ok.className = danger ? "btn btn-danger" : "btn btn-primary";
+  openModal("modal-confirm");
+  return new Promise(resolve => { confirmAnswer = resolve; });
+}
+function confirmDialogAnswer(answer) {
+  closeModal("modal-confirm");
+  const resolve = confirmAnswer;
+  confirmAnswer = null;
+  if (resolve) resolve(answer);
+}
 
 function helpCenterText() {
   const c = config();
@@ -747,7 +781,7 @@ async function mfaStartEnable() {
 
 async function mfaConfirmEnable() {
   const code = (document.getElementById("mfa-setup-code")?.value || "").replace(/\s+/g, "");
-  if (!code) { alert("Enter the code from your email."); return; }
+  if (!code) { showAlert("Enter the code from your email.", "Verification Code"); return; }
   try {
     const res = await api(mfaApi(mfaWho), { action: "mfa_confirm", code });
     mfaRecovery = res.recovery_codes || [];
@@ -775,7 +809,7 @@ function mfaFinishCodes() {
 
 async function mfaConfirmDisable() {
   const pass = document.getElementById("mfa-disable-pass")?.value || "";
-  if (!pass) { alert("Enter your password to turn two-factor off."); return; }
+  if (!pass) { showAlert("Enter your password to turn two-factor off.", "Two-Factor"); return; }
   try {
     await api(mfaApi(mfaWho), { action: "mfa_disable", password: pass });
     mfaState = "status";
@@ -823,7 +857,7 @@ async function beginChangeCode(who, purpose, run) {
 
 async function submitChangeCode() {
   const code = (document.getElementById("change-code-input")?.value || "").replace(/\s+/g, "");
-  if (!code) { alert("Enter the code from your email."); return; }
+  if (!code) { showAlert("Enter the code from your email.", "Verification Code"); return; }
   if (!changeCodeRun) return;
   try {
     await changeCodeRun(code);       // throws when the code or the change is rejected
@@ -941,7 +975,13 @@ async function pinLocated(key, pos) {
   const typed = (field.value || "").trim();
   // Never silently throw away something the customer wrote. Declining the
   // replace drops the pin too, so a pin can never point somewhere else.
-  if (typed && typed !== (previous ? previous.text : "") && !confirm("Replace the address you typed with your pinned location?")) {
+  if (typed && typed !== (previous ? previous.text : "") && !(await confirmDialog({
+    title: "Replace Your Address?",
+    message: "Use your pinned location instead of the address you typed?",
+    confirmLabel: "Use Pin",
+    cancelLabel: "Keep My Text",
+    danger: true,
+  }))) {
     clearPin(key, "Your typed address was kept, and the pin was removed.");
     return;
   }
@@ -1059,14 +1099,14 @@ async function handleSignUp() {
   const address = document.getElementById("signup-address").value.trim();
   const pinned = pin("signup");
 
-  if (!name || !email || !phone || !pass || !confirm) { alert("Please complete all required fields."); return; }
-  if (!validName(name)) { alert("Please enter a valid full name."); return; }
-  if (!validEmail(email)) { alert("Please enter a valid email address."); return; }
-  if (!validPhone(phone)) { alert("Please enter a valid 11-digit Philippine mobile number."); return; }
-  if (pass !== confirm) { alert("Passwords do not match."); return; }
-  const weak = passwordProblem(pass); if (weak) { alert(weak); return; }
-  if (!address) { alert("Please enter your delivery address, or pin your current location."); return; }
-  if (!document.getElementById("terms-check").checked) { alert("Please agree to the Terms & Conditions and Privacy Policy."); return; }
+  if (!name || !email || !phone || !pass || !confirm) { showAlert("Please complete all required fields.", "Create Account"); return; }
+  if (!validName(name)) { showAlert("Please enter a valid full name."); return; }
+  if (!validEmail(email)) { showAlert("Please enter a valid email address."); return; }
+  if (!validPhone(phone)) { showAlert("Please enter a valid 11-digit Philippine mobile number."); return; }
+  if (pass !== confirm) { showAlert("Passwords do not match."); return; }
+  const weak = passwordProblem(pass); if (weak) { showAlert(weak); return; }
+  if (!address) { showAlert("Please enter your delivery address, or pin your current location."); return; }
+  if (!document.getElementById("terms-check").checked) { showAlert("Please agree to the Terms & Conditions and Privacy Policy."); return; }
 
   try {
     // The address goes in with the account and becomes the customer's default,
@@ -1089,8 +1129,8 @@ async function handleSignUp() {
 async function handleSignIn() {
   const email = document.getElementById("login-email").value.trim().toLowerCase();
   const pass = document.getElementById("login-pass").value;
-  if (!email || !pass) { alert("Please enter your email and password."); return; }
-  if (!validEmail(email)) { alert("Please enter a valid email address."); return; }
+  if (!email || !pass) { showAlert("Please enter your email and password.", "Sign In"); return; }
+  if (!validEmail(email)) { showAlert("Please enter a valid email address."); return; }
 
   try {
     const res = await api("auth.php", { action: "signin", email, password: pass });
@@ -1114,7 +1154,7 @@ async function handleSignIn() {
 async function mfaSubmitLogin() {
   const code = (document.getElementById("mfa-login-code")?.value || "").replace(/\s+/g, "");
   const recovery = (document.getElementById("mfa-login-recovery")?.value || "").trim().toUpperCase();
-  if (!code && !recovery) { alert("Enter the code from your email, or a recovery code."); return; }
+  if (!code && !recovery) { showAlert("Enter the code from your email, or a recovery code."); return; }
   try {
     // Send only the field the user actually filled, so an empty code can never
     // shadow a valid recovery code.
@@ -1158,9 +1198,9 @@ async function submitPasswordReset() {
   const email = document.getElementById("reset-email").value.trim().toLowerCase();
   const phone = document.getElementById("reset-phone").value.trim();
   const pass = document.getElementById("reset-pass").value;
-  if (!validEmail(email)) { alert("Please enter a valid email address."); return; }
-  if (!validPhone(phone)) { alert("Please enter a valid 11-digit Philippine mobile number."); return; }
-  const weak = passwordProblem(pass); if (weak) { alert(weak); return; }
+  if (!validEmail(email)) { showAlert("Please enter a valid email address."); return; }
+  if (!validPhone(phone)) { showAlert("Please enter a valid 11-digit Philippine mobile number."); return; }
+  const weak = passwordProblem(pass); if (weak) { showAlert(weak); return; }
   try {
     await api("auth.php", { action: "reset_password", email, phone, password: pass });
     closeModal("modal-reset");
@@ -1373,7 +1413,7 @@ function renderCart() {
 
 function goCheckout() {
   const buyNow = checkoutMode === "buynow" && buyNowItem;
-  if (!cart.length && !buyNow) { alert("Your cart is empty."); return; }
+  if (!cart.length && !buyNow) { showAlert("Your cart is empty.", "Your Cart Is Empty"); return; }
   checkoutMode = cart.length ? "cart" : "buynow";
   navigateTo("screen-checkout");
 }
@@ -1420,16 +1460,16 @@ function renderCheckoutSummary() {
   return total;
 }
 function continueToPayment() {
-  if (!isStoreOpen()) { alert("FOODAY is closed right now. Please try again later."); return; }
+  if (!isStoreOpen()) { showAlert("FOODAY is closed right now. Please try again later.", "We're Closed"); return; }
   const name = document.getElementById("checkout-name").value.trim();
   const phone = document.getElementById("checkout-phone").value.trim();
   const address = document.getElementById("checkout-address").value.trim();
-  if (!name || !phone || !address) { alert("Please complete your delivery information."); return; }
-  if (!validName(name)) { alert("Please enter a valid full name."); return; }
-  if (!validPhone(phone)) { alert("Please enter a valid 11-digit Philippine mobile number."); return; }
+  if (!name || !phone || !address) { showAlert("Please complete your delivery information."); return; }
+  if (!validName(name)) { showAlert("Please enter a valid full name."); return; }
+  if (!validPhone(phone)) { showAlert("Please enter a valid 11-digit Philippine mobile number."); return; }
   const total = renderCheckoutSummary();
   const min = Number(config().min_total || 0);
-  if (min && total < min) { alert(`Minimum order is ${money(min)}.`); return; }
+  if (min && total < min) { showAlert(`Minimum order is ${money(min)}.`, "Minimum Order"); return; }
   setLocal("fooday_checkout", {
     name, phone,
     area: document.getElementById("checkout-area").value,
@@ -1462,11 +1502,11 @@ function renderPayment() {
     : "Choose how you would like to pay. Please prepare your payment when your order arrives.";
 }
 async function placeOrder() {
-  if (!isStoreOpen()) { alert("FOODAY is closed right now. Please try again later."); return; }
-  if (config().cod_enabled === false) { alert("Payments are temporarily unavailable."); return; }
+  if (!isStoreOpen()) { showAlert("FOODAY is closed right now. Please try again later.", "We're Closed"); return; }
+  if (config().cod_enabled === false) { showAlert("Payments are temporarily unavailable.", "Payments Unavailable"); return; }
   if (selectedPayment !== "Cash on Delivery") { notifyGcash(); return; }
   const items = activeOrderItems();
-  if (!items.length) { alert("Your cart is empty."); return; }
+  if (!items.length) { showAlert("Your cart is empty.", "Your Cart Is Empty"); return; }
   await finalizeOrder("Cash on Delivery", items, checkoutMode === "buynow");
 }
 async function finalizeOrder(payment, items, wasBuyNow) {
@@ -1559,7 +1599,7 @@ function orderTimelineHtml(o) {
 }
 function askCancelOrder() {
   const o = orders().find(x => x.id === currentOrderId); if (!o) return;
-  if (o.canCancel !== true) { alert("This order can no longer be cancelled. Please contact FOODAY support for help."); return; }
+  if (o.canCancel !== true) { showAlert("This order can no longer be cancelled. Please contact FOODAY support for help.", "Cannot Cancel"); return; }
   cancelTarget = o.id;
   document.getElementById("cancel-order-text").textContent = `Cancel ${o.id}? This cannot be undone.`;
   document.getElementById("cancel-reason").value = "";
@@ -1661,9 +1701,9 @@ async function saveProfile() {
   const name = document.getElementById("edit-name").value.trim();
   const email = document.getElementById("edit-email").value.trim().toLowerCase();
   const phone = document.getElementById("edit-phone").value.trim();
-  if (!validName(name)) { alert("Please enter a valid full name."); return; }
-  if (!validEmail(email)) { alert("Please enter a valid email address."); return; }
-  if (!validPhone(phone)) { alert("Please enter a valid 11-digit Philippine mobile number."); return; }
+  if (!validName(name)) { showAlert("Please enter a valid full name."); return; }
+  if (!validEmail(email)) { showAlert("Please enter a valid email address."); return; }
+  if (!validPhone(phone)) { showAlert("Please enter a valid 11-digit Philippine mobile number."); return; }
   // Only a change of the sign-in email needs a code; a name or phone tweak does not.
   if (email === (user().email || "").toLowerCase()) {
     try { await commitProfile(name, email, phone, ""); } catch (e) { reportError(e); }
@@ -1826,9 +1866,9 @@ async function submitPasswordChange() {
   const current = document.getElementById("pw-current").value;
   const next = document.getElementById("pw-new").value;
   const confirm = document.getElementById("pw-confirm").value;
-  if (!current || !next) { alert("Please complete all password fields."); return; }
-  if (next !== confirm) { alert("The new passwords do not match."); return; }
-  const weak = passwordProblem(next); if (weak) { alert(weak); return; }
+  if (!current || !next) { showAlert("Please complete all password fields."); return; }
+  if (next !== confirm) { showAlert("The new passwords do not match."); return; }
+  const weak = passwordProblem(next); if (weak) { showAlert(weak); return; }
   await beginChangeCode("user", "password", code => commitPasswordChange(current, next, confirm, code));
 }
 async function commitPasswordChange(current, next, confirm, code) {
@@ -1874,7 +1914,7 @@ async function saveAddress() {
   const landmark = document.getElementById("new-landmark").value.trim();
   const label = document.getElementById("new-address-label").value.trim() || "Home";
   const pinned = pin("saved");
-  if (!address) { alert("Please enter a complete address, or pin your current location."); return; }
+  if (!address) { showAlert("Please enter a complete address, or pin your current location."); return; }
   try {
     await api("account.php", {
       action: "add_address", address, landmark, label,
@@ -1889,7 +1929,14 @@ async function saveAddress() {
   } catch (e) { reportError(e); }
 }
 async function deleteAddress(id) {
-  if (!confirm("Delete this saved address?")) return;
+  const sure = await confirmDialog({
+    title: "Delete Address?",
+    message: "Delete this saved address? This cannot be undone.",
+    confirmLabel: "Delete",
+    cancelLabel: "Keep It",
+    danger: true,
+  });
+  if (!sure) return;
   try {
     await api("account.php", { action: "delete_address", id });
     await refreshStore();
@@ -2194,9 +2241,9 @@ async function confirmCashDelivery() {
   if (!o) return;
   const due = Number(o.total);
   const paid = parseFloat(document.getElementById("cash-received").value);
-  if (!isFinite(paid) || paid <= 0) { alert("Enter the cash the customer handed over."); return; }
+  if (!isFinite(paid) || paid <= 0) { showAlert("Enter the cash the customer handed over.", "Cash Payment"); return; }
   if (Math.round((paid - due) * 100) / 100 < 0) {
-    alert(`That is less than the amount due (${money(due)}). Ask the customer for the balance.`);
+    showAlert(`That is less than the amount due (${money(due)}). Ask the customer for the balance.`, "Cash Payment");
     return;
   }
   closeModal("modal-cash");
@@ -2292,9 +2339,9 @@ async function submitProduct() {
   const price = Number(document.getElementById("product-price").value);
   const category = document.getElementById("product-category").value;
   const desc = document.getElementById("product-description").value.trim();
-  if (!name || !price || price <= 0) { alert("Please enter a food name and a valid price."); return; }
-  if (!category) { alert("Please choose a category."); return; }
-  if (!editingProductId && !productImageData) { alert("Please choose a product image from your storage or album."); return; }
+  if (!name || !price || price <= 0) { showAlert("Please enter a food name and a valid price."); return; }
+  if (!category) { showAlert("Please choose a category."); return; }
+  if (!editingProductId && !productImageData) { showAlert("Please choose a product image from your storage or album."); return; }
   try {
     await api("products.php", editingProductId
       ? { action: "update", id: editingProductId, name, price, category, desc, img: productImageData }
@@ -2315,7 +2362,13 @@ async function toggleProductAvailability(id, currentlyAvailable) {
   } catch (e) { reportError(e); }
 }
 async function deleteProduct(id) {
-  if (!confirm("Remove this food? Past orders keep their saved copy.")) return;
+  const sure = await confirmDialog({
+    title: "Remove This Food?",
+    message: "Remove this food? Past orders keep their saved copy.",
+    confirmLabel: "Remove",
+    danger: true,
+  });
+  if (!sure) return;
   try {
     await api("products.php", { action: "delete", id });
     if (editingProductId === id) resetProductForm();
@@ -2378,7 +2431,7 @@ function openChangeEmail() {
 /** Saves a new sign-in email, leaving the rest of the admin profile as it is. */
 async function submitAdminEmail() {
   const email = document.getElementById("admin-email-new").value.trim().toLowerCase();
-  if (!validEmail(email)) { alert("Please enter a valid email address."); return; }
+  if (!validEmail(email)) { showAlert("Please enter a valid email address."); return; }
   const a = admin();
   if (email === (a.email || "").toLowerCase()) {
     try { await commitAdminEmail(a.name, email, a.phone, ""); } catch (e) { reportError(e); }
@@ -2424,7 +2477,7 @@ async function saveSettings() {
 }
 async function submitSettingsWithPassword() {
   const pass = document.getElementById("confirm-settings-pass").value;
-  if (!pass) { alert("Please enter your admin password."); return; }
+  if (!pass) { showAlert("Please enter your admin password."); return; }
   const payload = pendingSettings || collectSettings();
   closeModal("modal-confirm-settings");
   await commitSettings(payload, pass);
@@ -2451,9 +2504,9 @@ async function saveAdminProfile() {
   const name = document.getElementById("admin-edit-name").value.trim();
   const email = document.getElementById("admin-edit-email").value.trim().toLowerCase();
   const phone = document.getElementById("admin-edit-phone").value.trim();
-  if (!validName(name)) { alert("Please enter a valid full name."); return; }
-  if (!validEmail(email)) { alert("Please enter a valid email address."); return; }
-  if (phone && !validPhone(phone)) { alert("Please enter a valid 11-digit Philippine mobile number."); return; }
+  if (!validName(name)) { showAlert("Please enter a valid full name."); return; }
+  if (!validEmail(email)) { showAlert("Please enter a valid email address."); return; }
+  if (phone && !validPhone(phone)) { showAlert("Please enter a valid 11-digit Philippine mobile number."); return; }
   // Only a change of the sign-in email needs a code; the rest of the profile does not.
   if (email === (admin().email || "").toLowerCase()) {
     try { await commitAdminProfile(name, email, phone, ""); } catch (e) { reportError(e); }
@@ -2492,9 +2545,9 @@ async function submitAdminPassword() {
   const current = document.getElementById("admin-pw-current").value;
   const next = document.getElementById("admin-pw-new").value;
   const confirm = document.getElementById("admin-pw-confirm").value;
-  if (!current || !next) { alert("Please complete all password fields."); return; }
-  if (next !== confirm) { alert("The new passwords do not match."); return; }
-  const weak = passwordProblem(next); if (weak) { alert(weak); return; }
+  if (!current || !next) { showAlert("Please complete all password fields."); return; }
+  if (next !== confirm) { showAlert("The new passwords do not match."); return; }
+  const weak = passwordProblem(next); if (weak) { showAlert(weak); return; }
   await beginChangeCode("admin", "password", code => commitAdminPassword(current, next, confirm, code));
 }
 async function commitAdminPassword(current, next, confirm, code) {
@@ -2512,7 +2565,13 @@ async function adminSignOutOthers() {
   } catch (e) { reportError(e); }
 }
 async function clearLoginLog() {
-  if (!confirm("Clear the stored failed sign-in attempts?")) return;
+  const sure = await confirmDialog({
+    title: "Clear Sign-In Log?",
+    message: "Clear the stored failed sign-in attempts?",
+    confirmLabel: "Clear",
+    danger: true,
+  });
+  if (!sure) return;
   try {
     const res = await api("admin.php", { action: "clear_login_log" });
     await loadSecurityReport();
@@ -2547,7 +2606,7 @@ function renderAdminCategories() {
 async function adminAddCategory() {
   const name = capitalize(document.getElementById("new-category-name").value.trim());
   const icon = document.getElementById("new-category-icon").value.trim() || "🍴";
-  if (!name) { alert("Please enter a category name."); return; }
+  if (!name) { showAlert("Please enter a category name."); return; }
   try {
     await api("categories.php", { action: "add", name, icon });
     await refreshStore();
@@ -2560,7 +2619,13 @@ async function adminAddCategory() {
 async function deleteCategory(i) {
   const c = categories()[i];
   if (!c || c.locked) return;
-  if (!confirm(`Remove the "${c.name}" category?`)) return;
+  const sure = await confirmDialog({
+    title: "Remove Category?",
+    message: `Remove the "${c.name}" category?`,
+    confirmLabel: "Remove",
+    danger: true,
+  });
+  if (!sure) return;
   try {
     await api("categories.php", { action: "delete", name: c.name });
     await refreshStore();
@@ -2575,8 +2640,8 @@ async function addDeliveryArea() {
   const name = document.getElementById("area-name").value.trim();
   const feeRaw = document.getElementById("area-fee").value.trim();
   const fee = Number(feeRaw);
-  if (!name || !feeRaw) { alert("Please enter the area and delivery fee."); return; }
-  if (!Number.isFinite(fee) || fee < 0) { alert("Please enter a valid delivery fee — numbers only."); return; }
+  if (!name || !feeRaw) { showAlert("Please enter the area and delivery fee."); return; }
+  if (!Number.isFinite(fee) || fee < 0) { showAlert("Please enter a valid delivery fee — numbers only."); return; }
   try {
     await api("areas.php", { action: "add", name, fee: fee.toFixed(2) });
     await refreshStore();
@@ -2596,7 +2661,7 @@ async function publishAnnouncement() {
   const title = document.getElementById("announcement-title").value.trim();
   const message = document.getElementById("announcement-message").value.trim();
   const icon = document.getElementById("announcement-icon").value.trim() || "👏";
-  if (!title || !message) { alert("Please enter an announcement title and message."); return; }
+  if (!title || !message) { showAlert("Please enter an announcement title and message."); return; }
   try {
     await api("announcements.php", { action: "add", title, message, icon });
     await refreshStore();
@@ -2608,7 +2673,13 @@ async function publishAnnouncement() {
   } catch (e) { reportError(e); }
 }
 async function deleteAnnouncement(id) {
-  if (!confirm("Delete this announcement?")) return;
+  const sure = await confirmDialog({
+    title: "Delete Announcement?",
+    message: "Delete this announcement?",
+    confirmLabel: "Delete",
+    danger: true,
+  });
+  if (!sure) return;
   try {
     await api("announcements.php", { action: "delete", id });
     await refreshStore();
@@ -2631,7 +2702,7 @@ async function init() {
   try {
     await refreshStore();
   } catch (e) {
-    alert(e.message);
+    showAlert(e.message, "Cannot Reach the Server");
     return;
   }
   applyBranding();
