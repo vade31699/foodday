@@ -71,7 +71,9 @@ any PHP host:
 
 - **Database** is read from `DB_HOST` / `DB_PORT` / `DB_DATABASE` /
   `DB_USERNAME` / `DB_PASSWORD` (environment first, then `.env`). No host is
-  hard-coded in the request path.
+  hard-coded in the request path. It speaks MySQL through PDO, so it runs
+  against MySQL, MariaDB or a MySQL-compatible cloud database such as
+  [TiDB Cloud](#tidb-cloud).
 - **Mail** is read from the `MAIL_*` variables (see `.env.example`). Leaving
   them unset is safe: two-factor enrolment is refused rather than leaving an
   account that could never receive a code.
@@ -80,6 +82,60 @@ any PHP host:
   `SameSite=Lax`.
 - **Schema upgrades** run themselves on first connect (`api/migrations.php`),
   so deploying new code does not need a manual import.
+
+### TiDB Cloud
+
+FOODAY talks MySQL through PDO, and [TiDB Cloud](https://tidbcloud.com/)
+Starter/Essential is MySQL-compatible, so the app runs there with **no code
+changes** — only connection settings.
+
+1. **Create a Starter (or Essential) instance**, then open **Connect**, keep
+   the connection type as **Public**, and pick your client. The console offers
+   a string like:
+
+   ```
+   mysql://3fA9aBc.root:your-password@gateway01.us-east-1.prod.aws.tidbcloud.com:4000/fooday_db?ssl-mode=REQUIRED
+   ```
+
+   The user name carries the instance prefix (`….root`); percent-encoded
+   passwords are decoded for you.
+
+2. **Paste it as `DATABASE_URL`** (a real environment variable or `.env`). The
+   five separate `DB_*` variables still win when both are set, so use one or the
+   other. The `?ssl-mode=REQUIRED` query is read from the URL, so a pasted
+   string is enough to get connected.
+
+3. **TLS is required.** TiDB Cloud accepts only TLS 1.2/1.3. `REQUIRED`
+   encrypts the connection but does not verify the certificate; for a verified
+   connection set `DB_SSL_MODE=verify_identity` and point `DB_SSL_CA` at a CA
+   bundle. On Linux the app finds the system store itself; on Windows download
+   the [ISRG Root X1](https://letsencrypt.org/certs/isrgrootx1.pem) certificate
+   and set `DB_SSL_CA` to its path (e.g. `C:/certs/isrgrootx1.pem`). A verifying
+   mode with no usable CA is refused with a message, never silently downgraded.
+   Leaving `DB_SSL_MODE` unset keeps local MySQL/MariaDB on plain TCP.
+
+4. **Import `fooday.sql`.** A fresh instance is empty. Run the file in the
+   TiDB Cloud **SQL Editor** (or `mysql … < fooday.sql`). If you keep the
+   instance's own database name, drop the file's `CREATE DATABASE IF NOT
+   EXISTS fooday_db` and `USE fooday_db;` lines first and point `DB_DATABASE`
+   (or the URL's path) at that name. As on any host, `fooday.sql` is
+   destructive — run it only against a brand-new database.
+
+5. **Schema upgrades still run themselves.** `api/migrations.php` works the
+   same way against TiDB, so deploying new code needs no manual step.
+
+Portability notes the app keeps so TiDB behaves like MySQL:
+
+- **TLS** is driven by `DB_SSL_MODE` / `DB_SSL_CA` (or the URL query), never
+  assumed; unset means "local MySQL, no SSL".
+- **`ON DUPLICATE KEY UPDATE`** binds the new value again instead of using
+  `VALUES(col)`, which MySQL 8 deprecated and TiDB may not accept in that form.
+- The **order queue and announcements** sort newest-first by timestamp, not by
+  `id`: TiDB only promises auto-increment ids are *unique*, not sequential, so
+  "the biggest id" is not reliably the most recent row.
+- Everything else — InnoDB (ignored by TiDB), `ENUM`, foreign keys,
+  `information_schema`, `INTERVAL`, multi-table `DELETE` and
+  `utf8mb4_unicode_ci` — is supported by TiDB as-is.
 
 ### Keep secrets out of the web root
 

@@ -44,4 +44,38 @@ test('an empty or malformed value yields nothing, keeping the local defaults', f
     expect_same([], db_url_parts('not a url'), 'junk');
 });
 
+test('a TiDB Cloud Serverless URL is split, TLS mode and all', function () {
+    $url = 'mysql://3fA9aBc.root:Ab%40c%2Fd12@gateway01.us-east-1.prod.aws.tidbcloud.com:4000/fooday_db?ssl-mode=REQUIRED';
+    $parts = db_url_parts($url);
+    expect_same('gateway01.us-east-1.prod.aws.tidbcloud.com', $parts['host'], 'host');
+    expect_same(4000, $parts['port'], 'TiDB port');
+    expect_same('3fA9aBc.root', $parts['user'], 'the instance prefix is kept in the user');
+    expect_same('Ab@c/d12', $parts['pass'], 'a percent-encoded password is decoded');
+    expect_same('fooday_db', $parts['name'], 'database');
+    expect_same('REQUIRED', $parts['ssl_mode'], 'ssl-mode is carried through');
+});
+
+test('an ssl_ca path and the tls shorthand are read from the URL too', function () {
+    $ca = db_url_parts('mysql://u:p@h:4000/db?ssl_ca=/etc/ssl/certs/ca-certificates.crt');
+    expect_same('/etc/ssl/certs/ca-certificates.crt', $ca['ssl_ca'], 'ssl_ca');
+
+    $tls = db_url_parts('mysql://u:p@h:4000/db?tls=true');
+    expect_same('true', $tls['ssl_mode'], 'tls=true maps to a mode');
+
+    $plain = db_url_parts('mysql://u:p@h:4000/db');
+    expect_true(!isset($plain['ssl_mode']), 'a plain URL carries no mode');
+});
+
+test('the several TLS spellings fold onto five modes', function () {
+    expect_same('disabled', db_ssl_mode(''), 'empty is off');
+    expect_same('disabled', db_ssl_mode('DISABLED'), 'disabled');
+    expect_same('preferred', db_ssl_mode('PREFERRED'), 'preferred');
+    expect_same('required', db_ssl_mode('REQUIRED'), 'TiDB REQUIRED');
+    expect_same('required', db_ssl_mode('true'), 'tls=true');
+    expect_same('verify_ca', db_ssl_mode('VERIFY_CA'), 'verify_ca');
+    expect_same('verify_identity', db_ssl_mode('VERIFY_IDENTITY'), 'TiDB VERIFY_IDENTITY');
+    expect_same('verify_identity', db_ssl_mode('verify-full'), 'verify-full folds');
+    expect_same('bogus', db_ssl_mode('bogus'), 'an unknown mode is kept, to be refused later');
+});
+
 finish('database-url');

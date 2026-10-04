@@ -85,11 +85,13 @@ function fooday_meta_get(PDO $pdo, string $key): ?string
 
 function fooday_meta_set(PDO $pdo, string $key, string $value): void
 {
+    // The value is bound again for the UPDATE rather than using VALUES(v),
+    // which MySQL 8 deprecated and not every MySQL-compatible server supports.
     $stmt = $pdo->prepare(
         'INSERT INTO fooday_meta (k, v) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE v = VALUES(v)'
+         ON DUPLICATE KEY UPDATE v = ?'
     );
-    $stmt->execute([$key, $value]);
+    $stmt->execute([$key, $value, $value]);
 }
 
 /** Default values written the first time the settings store is created. */

@@ -40,9 +40,9 @@ if (isset(FOODAY_PUBLIC_FILES[$path])) {
     header('Content-Type: ' . $type);
     // index.html is the app shell and points at version-stamped assets, so it
     // must never be cached. The stamped assets themselves are safe to cache hard.
-    header('Cache-Control', $file === 'index.html'
+    header('Cache-Control: ' . ($file === 'index.html'
         ? 'no-cache, must-revalidate'
-        : 'public, max-age=31536000, immutable');
+        : 'public, max-age=31536000, immutable'));
     readfile(FOODAY_ROOT . '/' . $file);
     return;
 }

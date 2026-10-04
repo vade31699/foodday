@@ -218,9 +218,17 @@ test("the database connection is environment-driven, with local defaults", () =>
   assert.match(configPhp, /define\('DB_HOST', env\('DB_HOST',/, "DB_HOST comes from env()");
   assert.match(configPhp, /define\('DB_NAME', env\('DB_DATABASE',/, "DB_DATABASE");
   assert.match(configPhp, /define\('DB_USER', env\('DB_USERNAME',/, "DB_USERNAME");
-  assert.match(configPhp, /define\('DB_PASS', env\('DB_PASSWORD',/, "DB_PASSWORD");
-  assert.match(configPhp, /;port=' \. DB_PORT \./, "the port is part of the DSN");
+  assert.match(configPhp, /define\('DB_PASS', env\('DB_PASSWORD',/, "DB_PASSWORD");  assert.match(configPhp, /;port=' \. DB_PORT \. /, "the port is part of the DSN");
+  assert.match(configPhp, /define\('DB_PORT', env_int\('DB_PORT', \$db_url\['port'\] \?\? 3306\)\)/, "DB_PORT is defined with its own default");
   assert.match(configPhp, /env\('DB_HOST', \$db_url\['host'\] \?\? '127\.0\.0\.1'\)/, "with the local default as the fallback");
+});
+
+test("TLS is wired for a hosted database and stays off by default", () => {
+  assert.match(configPhp, /define\('DB_SSL_MODE', db_ssl_mode\(/, "DB_SSL_MODE comes from env or the URL");
+  assert.match(configPhp, /function db_ssl_options/, "the option builder stands on its own");
+  assert.match(configPhp, /\] \+ db_ssl_options\(\)\)/, "and is applied to the PDO connection");
+  assert.match(configPhp, /\['ssl-mode', 'ssl_mode', 'sslmode', 'ssl', 'tls'\]/, "a pasted TiDB URL's ?ssl-mode is understood");
+  assert.match(configPhp, /if \(\$mode === '' \|\| \$mode === 'preferred' \|\| \$mode === 'disabled'\)/, "no TLS asked for means no SSL options");
 });
 
 test("a single DATABASE_URL is accepted alongside the separate variables", () => {

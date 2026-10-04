@@ -16,6 +16,14 @@
 --  existing database in place and keeps all of your data.
 --  That is the normal way to update.
 --
+--  TIDB CLOUD (Starter/Essential)
+--    TiDB is MySQL-compatible, so this script imports unchanged
+--    through the TiDB Cloud SQL editor or the mysql client. TiDB
+--    requires TLS: set DB_SSL_MODE (and DB_SSL_CA) as described in
+--    .env.example, or paste the console's ?ssl-mode=REQUIRED URL
+--    as DATABASE_URL. The CREATE DATABASE / USE pair below is
+--    allowed for the instance's root user.
+--
 --  HOW TO PICK THE DATABASE
 --    The name is set once, below, at the USE line. Change it
 --    there if you do not want `fooday_db`, and change it in

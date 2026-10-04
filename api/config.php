@@ -47,6 +47,10 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
  * DATABASE_URL such as mysql://user:pass@host:3306/database. Both work: the
  * separate variables win when both are present, and db_url_parts() fills in
  * whatever the URL supplies when they are not.
+ *
+ * TiDB Cloud hands out exactly that URL — mysql://user.root:pass@host:4000/db
+ * ?ssl-mode=REQUIRED — and refuses plaintext connections, so the TLS mode and
+ * CA it asks for are read from the same URL and finished off by db_ssl_options().
  */
 
 /**
@@ -57,7 +61,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
  * connection that could never work. Returns [] when there is nothing usable,
  * which leaves the local defaults in place.
  *
- * @return array{host?:string,port?:int,name?:string,user?:string,pass?:string}
+ * @return array{host?:string,port?:int,name?:string,user?:string,pass?:string,ssl_mode?:string,ssl_ca?:string}
  */
 function db_url_parts(string $url): array
 {
@@ -89,6 +93,26 @@ function db_url_parts(string $url): array
         $out['name'] = rawurldecode($name);
     }
 
+    // A hosting panel often folds the TLS requirement into the same URL —
+    // TiDB Cloud hands out mysql://user:pass@host:4000/db?ssl-mode=REQUIRED —
+    // so the query is read here too and a single pasted URL is enough.
+    $query = [];
+    if (isset($parts['query'])) {
+        parse_str((string) $parts['query'], $query);
+    }
+    foreach (['ssl-mode', 'ssl_mode', 'sslmode', 'ssl', 'tls'] as $key) {
+        if (isset($query[$key]) && $query[$key] !== '') {
+            $out['ssl_mode'] = (string) $query[$key];
+            break;
+        }
+    }
+    foreach (['ssl_ca', 'ssl-ca', 'sslca', 'sslrootcert'] as $key) {
+        if (!empty($query[$key])) {
+            $out['ssl_ca'] = (string) $query[$key];
+            break;
+        }
+    }
+
     return $out;
 }
 
@@ -99,6 +123,115 @@ define('DB_NAME', env('DB_DATABASE', $db_url['name'] ?? 'fooday_db'));
 define('DB_USER', env('DB_USERNAME', $db_url['user'] ?? 'root'));
 define('DB_PASS', env('DB_PASSWORD', $db_url['pass'] ?? ''));
 define('DB_PORT', env_int('DB_PORT', $db_url['port'] ?? 3306));
+
+/**
+ * Normalise the many spellings a host uses for its TLS requirement.
+ *
+ * TiDB Cloud advertises "REQUIRED" and "VERIFY_IDENTITY" (MySQL client case),
+ * while a hosting panel may write "ssl", "tls", true or "verify-full". They all
+ * fold onto the five modes db_ssl_options() understands, so a pasted URL and a
+ * hand-written DB_SSL_MODE mean the same thing.
+ */
+function db_ssl_mode(string $value): string
+{
+    $v = str_replace(['-', ' '], '_', strtolower(trim($value)));
+
+    return match ($v) {
+        '', 'disable', 'disabled', 'off', 'false', '0', 'none'             => 'disabled',
+        'prefer', 'preferred'                                              => 'preferred',
+        'require', 'required', 'require_ssl', 'ssl', 'tls', 'true', 'on', '1' => 'required',
+        'verify_ca', 'verifyca'                                            => 'verify_ca',
+        'verify_identity', 'verifyidentity', 'verify_full'                 => 'verify_identity',
+        default                                                            => $v,
+    };
+}
+
+/**
+ * The CA bundle the platform already ships, if any.
+ *
+ * TiDB Cloud's certificate is signed by Let's Encrypt, which Linux hosts keep
+ * in the system store — so a verifying mode usually needs no file path there.
+ * Windows has no standard path, so DB_SSL_CA has to name the ISRG Root X1 file.
+ */
+function db_system_ca_bundle(): string
+{
+    $candidates = [
+        (string) ini_get('openssl.cafile'),
+        (string) ini_get('curl.cainfo'),
+        '/etc/ssl/certs/ca-certificates.crt',  // Debian / Ubuntu / Arch
+        '/etc/pki/tls/certs/ca-bundle.crt',    // RedHat / Fedora / CentOS
+        '/etc/ssl/ca-bundle.pem',              // OpenSUSE
+        '/etc/ssl/cert.pem',                   // macOS / Alpine
+    ];
+    foreach ($candidates as $path) {
+        if ($path !== '' && is_readable($path)) {
+            return $path;
+        }
+    }
+    return '';
+}
+
+/**
+ * PDO SSL options for the connection.
+ *
+ * Returns [] when no TLS was asked for, so a local MySQL/MariaDB server without
+ * SSL keeps working exactly as before. A hosted TiDB Cloud Starter instance
+ * refuses plaintext, so its URL (or DB_SSL_MODE) turns one of the modes on.
+ *
+ * @return array<int,mixed>
+ */
+function db_ssl_options(): array
+{
+    $mode = DB_SSL_MODE;
+    if ($mode === '' || $mode === 'preferred' || $mode === 'disabled') {
+        return [];
+    }
+    if (!in_array($mode, ['required', 'verify_ca', 'verify_identity'], true)) {
+        throw new ApiError(
+            'DB_SSL_MODE was "' . $mode . '". Use disabled, preferred, required, verify_ca or verify_identity.'
+        );
+    }
+
+    $ca = DB_SSL_CA !== '' ? DB_SSL_CA : db_system_ca_bundle();
+    if (DB_SSL_VERIFY_SERVER_CERT && $ca === '') {
+        throw new ApiError(
+            'The database TLS mode verifies the server certificate but no CA bundle was found. '
+            . 'Set DB_SSL_CA to the CA file — for TiDB Cloud, download the ISRG Root X1 certificate.'
+        );
+    }
+
+    $options = [];
+    if ($ca !== '') {
+        $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
+    }
+    // Any SSL option makes the driver actually offer TLS; with a CA and the
+    // verify flag on, the certificate chain (and, for verify_identity, the
+    // hostname) is checked as well.
+    $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = DB_SSL_VERIFY_SERVER_CERT;
+    if (DB_SSL_CERT !== '') {
+        $options[PDO::MYSQL_ATTR_SSL_CERT] = DB_SSL_CERT;
+    }
+    if (DB_SSL_KEY !== '') {
+        $options[PDO::MYSQL_ATTR_SSL_KEY] = DB_SSL_KEY;
+    }
+    return $options;
+}
+
+/*
+ * TLS. TiDB Cloud Starter/Essential refuses plaintext connections, so a host
+ * there sets DB_SSL_MODE=verify_identity (plus DB_SSL_CA, or a system bundle the
+ * app finds for itself). With no mode set, no SSL options are passed at all and
+ * a stock WAMP/XAMPP install behaves exactly as before.
+ */
+define('DB_SSL_MODE', db_ssl_mode(env('DB_SSL_MODE', $db_url['ssl_mode'] ?? '')));
+define('DB_SSL_CA', env('DB_SSL_CA', $db_url['ssl_ca'] ?? ''));
+define('DB_SSL_CERT', env('DB_SSL_CERT', ''));
+define('DB_SSL_KEY', env('DB_SSL_KEY', ''));
+define('DB_SSL_VERIFY_SERVER_CERT', env_bool(
+    'DB_SSL_VERIFY_SERVER_CERT',
+    DB_SSL_MODE === 'verify_ca' || DB_SSL_MODE === 'verify_identity'
+));
+
 const DB_CHARSET = 'utf8mb4';
 
 /* ---------------------------------------------------------------
@@ -236,10 +369,10 @@ function db(): PDO
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
-            ]);
+            ] + db_ssl_options());
         } catch (PDOException $e) {
             throw new ApiError(
-                'Could not connect to the FOODAY database. Check api/config.php and make sure fooday.sql was imported.',
+                'Could not connect to the FOODAY database. Check the DB_* settings (or DATABASE_URL) — and DB_SSL_MODE for TLS — and make sure fooday.sql was imported.',
                 500
             );
         }
@@ -395,11 +528,14 @@ function setting_bool(string $key, bool $default = false): bool
 
 function setting_set(string $key, string $value): void
 {
+    // The value is bound again for the UPDATE instead of using VALUES(v): the
+    // function is deprecated in MySQL 8 and not guaranteed on every
+    // MySQL-compatible server (TiDB), while a second placeholder is universal.
     $stmt = db()->prepare(
         'INSERT INTO settings (k, v) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE v = VALUES(v)'
+         ON DUPLICATE KEY UPDATE v = ?'
     );
-    $stmt->execute([$key, $value]);
+    $stmt->execute([$key, $value, $value]);
     settings_cache_reset();
 }
 
@@ -407,10 +543,10 @@ function setting_set_many(array $pairs): void
 {
     $stmt = db()->prepare(
         'INSERT INTO settings (k, v) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE v = VALUES(v)'
+         ON DUPLICATE KEY UPDATE v = ?'
     );
     foreach ($pairs as $k => $v) {
-        $stmt->execute([(string) $k, (string) $v]);
+        $stmt->execute([(string) $k, (string) $v, (string) $v]);
     }
     settings_cache_reset();
 }
@@ -795,7 +931,7 @@ function fetch_announcements(): array
         "SELECT id, title, message, icon,
                 DATE_FORMAT(created_at, '%Y-%m-%d %h:%i %p') AS date
            FROM announcements
-         ORDER BY id DESC"
+         ORDER BY created_at DESC, id DESC"
     )->fetchAll();
     return array_map(static fn(array $r): array => [
         'id'      => (int) $r['id'],
@@ -939,15 +1075,18 @@ function fetch_orders(?int $userId, bool $isAdmin = false): array
                        delivery_fee, total, source, placed_at, status_updated, cash_tendered, change_due,
                        accepted_at, prepared_at, dispatched_at, delivered_at, cancelled_at';
 
+    // Newest first by time, not by id: TiDB only guarantees auto-increment ids
+    // are unique, not sequential, so "the biggest id" is not reliably the most
+    // recent order. id stays as the tie-break for two orders in one second.
     if ($userId === null) {
         $stmt = db()->query(
             "SELECT $columns, DATE_FORMAT(placed_at, '%Y-%m-%d %h:%i %p') AS placed
-               FROM orders ORDER BY id DESC"
+               FROM orders ORDER BY placed_at DESC, id DESC"
         );
     } else {
         $stmt = db()->prepare(
             "SELECT $columns, DATE_FORMAT(placed_at, '%Y-%m-%d %h:%i %p') AS placed
-               FROM orders WHERE user_id = ? ORDER BY id DESC"
+               FROM orders WHERE user_id = ? ORDER BY placed_at DESC, id DESC"
         );
         $stmt->execute([$userId]);
     }

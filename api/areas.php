@@ -21,11 +21,15 @@ switch ($action) {
             throw new ApiError('Please enter a valid delivery fee — numbers only.');
         }
 
+        // The fee is bound again for the UPDATE rather than using VALUES(fee),
+        // which MySQL 8 deprecated and not every MySQL-compatible server
+        // (TiDB) supports in that form.
+        $amount = number_format((float) $fee, 2, '.', '');
         $stmt = db()->prepare(
             'INSERT INTO delivery_areas (name, fee) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE fee = VALUES(fee)'
+             ON DUPLICATE KEY UPDATE fee = ?'
         );
-        $stmt->execute([$name, number_format((float) $fee, 2, '.', '')]);
+        $stmt->execute([$name, $amount, $amount]);
         ok();
         break;
 
