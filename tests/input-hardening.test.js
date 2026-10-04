@@ -290,3 +290,8 @@ test("the public/ front controller serves only the app's public files", () => {
   assert.ok(!/readfile\([^)]*\$path/.test(frontController), "the request path is never streamed straight from disk");
   assert.match(frontController, /http_response_code\(404\)/, "anything else is a 404");
 });
+
+test("the app also has an entry point at the repository root", () => {
+  const rootEntry = read("index.php");
+  assert.match(rootEntry, /require __DIR__ \. '\/public\/index\.php';/, "it delegates to the one front controller");
+});

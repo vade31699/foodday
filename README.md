@@ -146,7 +146,9 @@ be found.
    answers 404 for anything else. Because no other file is copied into the web
    root, `fooday.sql`, `README.md`, `tests/` and any `.env` stay unreachable —
    this replaces the `.htaccess` and `web.config` rules, which Laravel Cloud's
-   nginx does not read.
+   nginx does not read. If the host instead serves the repository root, the
+   root `index.php` delegates to the same controller, so both layouts serve
+   the identical, restricted set of files.
 
 ## Accounts
 
@@ -529,6 +531,8 @@ tests/
 ## Structure
 
 ```
+index.php         entry point for a repository-root document root (delegates to
+                  public/index.php)
 index.html        UI (all screens), loading styles.css and app.js with a ?v= cache
                   version
 styles.css        styles
