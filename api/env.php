@@ -16,12 +16,22 @@ declare(strict_types=1);
  *    "=" and strips wrapping quotes.
  */
 
-/** Absolute path of the .env this project reads. */
+/**
+ * Absolute path of the .env this project reads.
+ *
+ * Defaults to the project root, but a host may point FOODAY_ENV_FILE at a
+ * path outside the document root (say, /etc/fooday/.env) so the file can
+ * never be served over HTTP. Read with getenv() rather than env() on purpose:
+ * env() loads this file, so asking it where the file is would recurse.
+ */
 function env_file_path(): string
 {
     static $path = null;
     if ($path === null) {
-        $path = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env';
+        $override = getenv('FOODAY_ENV_FILE');
+        $path = (is_string($override) && $override !== '')
+            ? $override
+            : dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env';
     }
     return $path;
 }

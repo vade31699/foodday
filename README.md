@@ -67,7 +67,7 @@ incoming-order queue and move each order one step at a time.
 ## Deploying
 
 The app is plain PHP + MySQL with no framework and no Composer, so it runs on
-any PHP host. The code is already deployment-ready:
+any PHP host:
 
 - **Database** is read from `DB_HOST` / `DB_PORT` / `DB_DATABASE` /
   `DB_USERNAME` / `DB_PASSWORD` (environment first, then `.env`). No host is
@@ -80,6 +80,38 @@ any PHP host. The code is already deployment-ready:
   `SameSite=Lax`.
 - **Schema upgrades** run themselves on first connect (`api/migrations.php`),
   so deploying new code does not need a manual import.
+
+### Keep secrets out of the web root
+
+Every file in the document root is public. `.env` holds the database password,
+the SMTP app password and `MFA_PEPPER`, so a production deploy should not put
+it there. In order of preference:
+
+1. **Set real environment variables** (`DB_*`, `MAIL_*`, `MFA_*`) in the
+   hosting panel. They always win over any file, so nothing secret needs to be
+   uploaded at all — this is the recommended deploy.
+2. **Point `FOODAY_ENV_FILE` at a path outside the document root** (for example
+   `/etc/fooday/.env`) and keep the values there.
+3. **Leave `.env` in the project folder.** Apache and IIS are covered by the
+   bundled `.htaccess` and `web.config`, which refuse to serve `.env`, `*.sql`,
+   `*.md`, `tests/` and hidden files. nginx does not read those files, so add
+   the equivalent yourself:
+
+   ```nginx
+   location ~ /\.(?!well-known) { deny all; }
+   location ~* \.(env|sql|md|log)$ { deny all; }
+   location ^~ /tests/ { deny all; }
+   ```
+
+`README.md` prints the seeded admin password and `fooday.sql` holds the schema
+and that same password hash, so neither should be public either — the rules
+above block both. (`README.md` and `fooday.sql` are the only files in the
+folder that are both non-essential and unsafe to expose; `app.js`, `styles.css`
+and `api/*.php` must stay reachable.)
+
+The PHP built-in server (`php -S`) reads neither `.htaccess` nor `web.config`,
+so on that path keep it bound to `127.0.0.1` as the Setup step does, or move
+`.env` outside the folder with `FOODAY_ENV_FILE`.
 
 **Set the document root to this folder** (the one holding `index.html` and
 `api/`). If the host forces a `public/` document root, the whole project has to
@@ -482,10 +514,10 @@ index.html        UI (all screens), loading styles.css and app.js with a ?v= cac
                   version
 styles.css        styles
 app.js            frontend logic (talks to api/*.php)
-fooday.sql        database schema (v7) + seed data. DESTRUCTIVE - see Setup
+fooday.sql        database schema (v9) + seed data. DESTRUCTIVE - see Setup
 api/
   config.php      PDO connection, session, settings, auth + order helpers
-  migrations.php  upgrades an existing database to v7 in place, without dropping
+  migrations.php  upgrades an existing database to v9 in place, without dropping
   bootstrap.php   loads session + catalog for the frontend
   auth.php        signup / signin / logout / password reset
   admin.php       settings, profile, password, security report, stats

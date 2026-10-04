@@ -1,9 +1,9 @@
 -- ============================================================
---  FOODAY - Database schema v7 (MySQL / MariaDB)
+--  FOODAY - Database schema v9 (MySQL / MariaDB)
 -- ============================================================
 --  !!  THIS SCRIPT IS DESTRUCTIVE. IT DELETES EVERYTHING.      !!
 --  !!
---  !!  It runs DROP TABLE on all 14 tables below, so every     !!
+--  !!  It runs DROP TABLE on all 17 tables below, so every     !!
 --  !!  order, customer, address and favourite in the target    !!
 --  !!  database is destroyed and cannot be recovered unless     !!
 --  !!  you have a backup or binary logging switched on.        !!
@@ -453,5 +453,6 @@ INSERT INTO settings (k, v) VALUES
   ('login_lockout_minutes',  '15'),
   ('session_idle_minutes',   '60');
 
--- migration marker
-INSERT INTO fooday_meta (k, v) VALUES ('schema_version', '8');
+-- migration marker — must match FOODAY_SCHEMA_VERSION in api/migrations.php
+-- so a fresh import is already up to date and skips the migration pass.
+INSERT INTO fooday_meta (k, v) VALUES ('schema_version', '9');

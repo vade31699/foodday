@@ -158,11 +158,21 @@ class ApiError extends Exception
 }
 
 set_exception_handler(function (Throwable $e): void {
-    $status = $e instanceof ApiError ? $e->status : 500;
+    // A curated ApiError carries a message the user can act on (including the
+    // setup hints for an empty database). Anything else is unexpected, so its
+    // detail goes to the server log and the client gets a generic line — a raw
+    // PDO/stack message must never be echoed to the browser in production.
+    if ($e instanceof ApiError) {
+        $status  = $e->status;
+        $message = $e->getMessage();
+    } else {
+        $status  = 500;
+        $message = 'Something went wrong. Please try again.';
+    }
     if ($status >= 500) {
         error_log('FOODAY: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
     }
-    json_out(['ok' => false, 'error' => $e->getMessage()], $status);
+    json_out(['ok' => false, 'error' => $message], $status);
 });
 
 function db(): PDO
@@ -185,9 +195,11 @@ function db(): PDO
         try {
             fooday_migrate($pdo);
         } catch (ApiError $e) {
+            // Already curated for the user (e.g. "import fooday.sql").
             throw $e;
         } catch (Throwable $e) {
-            throw new ApiError('Could not upgrade the FOODAY database schema: ' . $e->getMessage(), 500);
+            error_log('FOODAY migration failed: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            throw new ApiError('Could not upgrade the FOODAY database schema. See the server log for details.', 500);
         }
         fooday_session_guard();
     }

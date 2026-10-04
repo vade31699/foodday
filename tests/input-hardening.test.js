@@ -28,6 +28,11 @@ const indexHtml = read("index.html");
 const stylesCss = read("styles.css");
 const configPhp = read("api/config.php");
 const areasPhp = read("api/areas.php");
+const envPhp = read("api/env.php");
+const migrationsPhp = read("api/migrations.php");
+const sql = read("fooday.sql");
+const htaccess = read(".htaccess");
+const webConfig = read("web.config");
 
 /* ---------- app.js in a sandbox, for the pure helpers ---------- */
 
@@ -218,4 +223,42 @@ test("the database connection is environment-driven, with local defaults", () =>
 test("no query is built by string concatenation", () => {
   assert.ok(!/WHERE id = ' \. \$/.test(configPhp), "no id is pasted into SQL");
   assert.ok(!/\$pdo->query\('[^']*' \./.test(configPhp), "and no query is assembled from a variable");
+});
+
+test("an unexpected error never echoes its raw message to the client", () => {
+  const handler = configPhp.slice(configPhp.indexOf("set_exception_handler"));
+  assert.match(handler, /instanceof ApiError/, "curated errors and raw throwables are told apart");
+  assert.match(handler, /else \{\s*\$status\s*=\s*500;\s*\$message\s*=\s*'Something went wrong/, "an unexpected error gets a generic line");
+  assert.match(handler, /json_out\(\['ok' => false, 'error' => \$message\]/, "the response uses the message variable, not the throwable");
+  assert.ok(!/json_out\([^\n]*getMessage/.test(handler), "a raw message is never sent to the browser");
+});
+
+test("a failed schema upgrade reports generically and logs the detail", () => {
+  assert.ok(!/Could not upgrade the FOODAY database schema: ' \. \$e->getMessage\(\)/.test(configPhp), "the driver message is not returned");
+  assert.match(configPhp, /Could not upgrade the FOODAY database schema\. See the server log/, "the client gets a generic upgrade error");
+});
+
+test(".env can be pointed outside the document root", () => {
+  assert.match(envPhp, /getenv\('FOODAY_ENV_FILE'\)/, "FOODAY_ENV_FILE is honoured");
+  const pathFn = envPhp.slice(envPhp.indexOf("function env_file_path"));
+  assert.match(pathFn, /getenv\('FOODAY_ENV_FILE'\)[\s\S]*dirname\(__DIR__\)/, "and falls back to the project-root .env");
+});
+
+test("a fresh import is stamped with the current schema version", () => {
+  const code = (migrationsPhp.match(/FOODAY_SCHEMA_VERSION = '(\d+)'/) || [])[1];
+  const seed = (sql.match(/'schema_version',\s*'(\d+)'/) || [])[1];
+  assert.ok(code, "migrations.php declares a schema version");
+  assert.equal(seed, code, "fooday.sql seeds the same version, so a fresh import skips the migration pass");
+});
+
+test("the bundled server rules refuse to serve secrets and source data", () => {
+  assert.match(htaccess, /FilesMatch[\s\S]*\\\.env/, "Apache denies dotfiles");
+  assert.match(htaccess, /\\\.sql/, "Apache denies the SQL dump");
+  assert.match(htaccess, /\\\.md/, "Apache denies README.md");
+  assert.match(htaccess, /tests/, "Apache denies tests/");
+  assert.match(htaccess, /Options -Indexes/, "Apache directory listings are off");
+
+  assert.match(webConfig, /<add segment="\.env"/, "IIS hides .env");
+  assert.match(webConfig, /<add segment="tests"/, "IIS hides tests/");
+  assert.match(webConfig, /directoryBrowse enabled="false"/, "IIS directory browsing is off");
 });

@@ -1,0 +1,39 @@
+# ============================================================
+#  FOODAY — Apache rules for when THIS folder is the document root.
+# ============================================================
+#  A web server serves every file under its document root, and the
+#  README's deployment model puts the app's secrets (.env) and source
+#  data (fooday.sql, README.md) in the same folder as index.html.
+#  These rules stop those files being downloaded. Apache loads them
+#  automatically whenever AllowOverride permits .htaccess (the XAMPP
+#  and WAMP defaults do).
+#
+#  nginx and other servers do not read this file — use the equivalent
+#  blocks in the README's "Deploying" section. Better still, keep .env
+#  out of the document root entirely.
+
+# No directory listings (hides tests/, api/, and dot-directories).
+Options -Indexes
+
+# Never hand out dotfiles or the project's private source/data files.
+<IfModule mod_authz_core.c>
+    <FilesMatch "(^\.|\.env$|\.sql$|\.md$|\.json$|\.lock$|\.log$|composer\.(json|lock)$)">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+    <FilesMatch "(^\.|\.env$|\.sql$|\.md$|\.json$|\.lock$|\.log$|composer\.(json|lock)$)">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>
+
+# Hidden directories (.git, .freebuff) and tests/, when mod_rewrite is
+# available. The rule above already blocks the files themselves even if
+# mod_rewrite is switched off. .well-known is left alone so certificate
+# validation keeps working.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule "(^|/)\.(?!well-known)" - [F,L]
+    RewriteRule ^tests(/|$) - [F,L]
+</IfModule>
