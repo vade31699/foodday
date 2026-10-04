@@ -26,6 +26,7 @@ const read = file => fs.readFileSync(path.join(ROOT, file), "utf8");
 
 const appJs = read("app.js");
 const indexHtml = read("index.html");
+const stylesCss = read("styles.css");
 
 /* A native call is `alert(`, `confirm(` or `prompt(` with nothing but a word
  * break in front of it. The [^\w.$] guard is what keeps the helpers
@@ -186,4 +187,63 @@ test("confirming resolves true", async () => {
   app.run("confirmDialogAnswer(true)");
   assert.equal(await pending, true, "confirming resolves true");
   assert.ok(!app.dom.isOpen("modal-confirm"), "and closes the sheet");
+});
+
+/* ---------- the sign-in form reports under its own fields ---------- */
+
+test("the sign-in form carries its own error line, under both inputs", () => {
+  const email = indexHtml.indexOf('id="login-email"');
+  const pass = indexHtml.indexOf('id="login-pass"');
+  const err = indexHtml.indexOf('id="login-error"');
+
+  assert.notEqual(email, -1, "the email field exists");
+  assert.notEqual(pass, -1, "the password field exists");
+  assert.notEqual(err, -1, "the error line exists");
+  assert.ok(err > pass, "it sits below the password field, so under both inputs");
+  assert.match(indexHtml.slice(err - 140, err + 60), /role="alert"/, "and is announced to a screen reader");
+
+  assert.match(stylesCss, /\.field-error\{display:none/, "hidden until it has something to say");
+  assert.match(stylesCss, /\.field-error\.show\{display:block\}/, "and shown once it does");
+});
+
+test("a rejected sign-in is reported under the fields, not in a sheet", async () => {
+  const fresh = loadApp();
+  fresh.run(`document.getElementById("login-email").value = "a@b.com"`);
+  fresh.run(`document.getElementById("login-pass").value = "secret1"`);
+  fresh.run(`api = async () => { const e = new Error("The email or password is incorrect."); e.status = 400; throw e; }`);
+  await fresh.run("handleSignIn()");
+
+  assert.ok(!fresh.dom.isOpen("modal-info"), "no alert sheet is opened for a rejected sign-in");
+  const err = fresh.dom.el("login-error");
+  assert.equal(err.textContent, "The email or password is incorrect.", "the server's message is shown verbatim");
+  assert.ok(err.classList.contains("show"), "the inline error is visible");
+});
+
+test("an empty sign-in is refused under the fields too", async () => {
+  const fresh = loadApp();
+  await fresh.run("handleSignIn()");
+
+  assert.ok(!fresh.dom.isOpen("modal-info"), "no alert sheet for an empty form");
+  assert.equal(fresh.dom.el("login-error").textContent, "Please enter your email and password.");
+});
+
+test("a failure that is not about the fields keeps the sheet", async () => {
+  const fresh = loadApp();
+  fresh.run(`document.getElementById("login-email").value = "a@b.com"`);
+  fresh.run(`document.getElementById("login-pass").value = "secret1"`);
+  fresh.run(`api = async () => { throw new Error("Cannot reach the FOODAY server."); }`);
+  await fresh.run("handleSignIn()");
+
+  assert.ok(fresh.dom.isOpen("modal-info"), "a dead server still uses the alert sheet");
+  assert.ok(!fresh.dom.el("login-error").classList.contains("show"), "and shows nothing under the fields");
+});
+
+test("editing a field clears the sign-in error", async () => {
+  const fresh = loadApp();
+  await fresh.run("handleSignIn()");
+  assert.ok(fresh.dom.el("login-error").classList.contains("show"), "it starts shown");
+
+  fresh.run("clearLoginError()");
+  assert.ok(!fresh.dom.el("login-error").classList.contains("show"), "and is cleared once the user types");
+  assert.equal(fresh.dom.el("login-error").textContent, "");
 });

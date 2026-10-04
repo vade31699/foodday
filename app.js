@@ -150,6 +150,7 @@ async function api(path, payload) {
   if (!res.ok || data.ok === false) {
     const err = new Error(data.error || `Request failed (${res.status}).`);
     err.unauthorized = res.status === 401;
+    err.status = res.status;          // lets a caller tell a rejected form from a dead server
     throw err;
   }
   return data;
@@ -535,6 +536,7 @@ function navigateTo(id) {
   document.getElementById("bottom-nav").style.display = USER_SCREENS.includes(id) ? "flex" : "none";
   document.querySelectorAll("#bottom-nav button").forEach(b => b.classList.toggle("active", b.dataset.screen === id));
   fabSyncScreen(id);
+  if (id === "screen-signin") clearLoginError();
   if (id === "screen-home") renderHome();
   if (id === "screen-menu") renderMenu();
   if (id === "screen-cart") renderCart();
@@ -1126,11 +1128,23 @@ async function handleSignUp() {
   } catch (e) { reportError(e); }
 }
 
+/* The sign-in form reports its own problems under its fields rather than in a
+ * sheet: a wrong email or password is about those two boxes, and a sheet hides
+ * them. Everything the server can say about this form comes back as a 400. */
+function showLoginError(message) {
+  const el = document.getElementById("login-error");
+  if (!el) return;
+  el.textContent = message || "";
+  el.classList.toggle("show", !!message);
+}
+function clearLoginError() { showLoginError(""); }
+
 async function handleSignIn() {
   const email = document.getElementById("login-email").value.trim().toLowerCase();
   const pass = document.getElementById("login-pass").value;
-  if (!email || !pass) { showAlert("Please enter your email and password.", "Sign In"); return; }
-  if (!validEmail(email)) { showAlert("Please enter a valid email address."); return; }
+  clearLoginError();
+  if (!email || !pass) { showLoginError("Please enter your email and password."); return; }
+  if (!validEmail(email)) { showLoginError("Please enter a valid email address."); return; }
 
   try {
     const res = await api("auth.php", { action: "signin", email, password: pass });
@@ -1148,7 +1162,13 @@ async function handleSignIn() {
     }
 
     await mfaFinishSignIn(res);
-  } catch (e) { reportError(e); }
+  } catch (e) {
+    // A 400 is the server rejecting this form (wrong email or password). Any
+    // other failure — a dead server, an expired session — is not about these
+    // fields, so it keeps the normal sheet.
+    if (e && e.status === 400) { showLoginError(e.message); return; }
+    reportError(e);
+  }
 }
 
 async function mfaSubmitLogin() {

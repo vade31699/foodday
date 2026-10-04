@@ -26,6 +26,10 @@ button{cursor:pointer}
 .brand-lockup h1{font:600 2.75rem "Bodoni Moda",serif;letter-spacing:2px;margin-top:14px}.brand-lockup p{font:600 1rem "Cormorant Garamond",serif;margin:1px 0 30px}.gold-heart{color:var(--secondary);font-size:1.05rem}
 .onboarding-screen{padding:15px 18px 20px;justify-content:space-between;text-align:center}.topbar{display:flex;justify-content:space-between;align-items:center}.skip-btn{border:0;background:none;color:var(--muted);font-size:.72rem}.rider-wrap{width:100%;max-width:350px;margin:3px auto}.rider-wrap svg{width:100%;height:auto}.onboarding-copy{padding:0 18px}.onboarding-copy h2{font:700 1.3rem Poppins;line-height:1.2}.onboarding-copy p{font-size:.77rem;line-height:1.55;color:var(--muted);margin-top:8px}.onboarding-bottom{display:flex;flex-direction:column;gap:13px}.dots{display:flex;justify-content:center;gap:5px}.dots i{width:6px;height:6px;background:#D8CCC3;border-radius:50%}.dots i.active{width:18px;background:var(--primary);border-radius:5px}
 .auth-content{padding:18px}.auth-content h2{font:700 1.25rem Poppins;margin:4px 0 7px}.subtitle{font-size:.7rem;color:var(--muted);margin-bottom:17px}.form-stack{display:flex;flex-direction:column;gap:6px}.form-stack label{font-size:.68rem;font-weight:700;margin-top:3px}.input{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 12px;outline:0;color:var(--text);font-size:.78rem}.input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(149,34,45,.07)}textarea.input{resize:none}.check-row{display:flex;align-items:flex-start;gap:7px;color:var(--muted);font-size:.64rem;line-height:1.4;margin:10px 0 14px}.check-row input{accent-color:var(--primary);margin-top:2px}.switch-auth{text-align:center;font-size:.67rem;color:var(--muted);margin-top:15px}.switch-auth button,.forgot button{border:0;background:none;color:var(--primary);font-weight:800}.forgot{text-align:right;margin:9px 0 13px}.forgot button{font-size:.66rem}
+/* Inline form error: hidden until a message is put in it, so an empty one never
+   leaves a gap in the stack. */
+.field-error{display:none;margin-top:2px;font-size:.62rem;font-weight:800;color:var(--primary);line-height:1.4}
+.field-error.show{display:block}
 .home-header{height:73px;min-height:73px;background:#fff;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 34px;align-items:center;padding:0 14px;position:sticky;top:0;z-index:20}.home-brand{display:flex;align-items:center;gap:9px}.home-brand img{width:40px;height:40px;border-radius:11px;object-fit:cover}.home-brand p{font-size:.63rem;color:var(--muted);margin-bottom:2px}.home-brand strong{font-size:.74rem}.header-icon{border:0;background:none;color:var(--primary);font-size:1.15rem}.header-icon svg,.cart-head svg,.bottom-nav svg,.search-box svg,.discover-btn svg,.add-cart-btn svg,.admin-icon svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .announcement-banner{background:var(--primary);color:#fff;border-radius:17px;padding:13px 14px;margin-bottom:13px;display:flex;gap:10px;align-items:center;box-shadow:0 8px 20px rgba(149,34,45,.18)}.announcement-banner .announce-icon{width:38px;height:38px;border-radius:12px;background:var(--secondary);color:var(--primary);display:grid;place-items:center;font-size:1.2rem;flex:none}.announcement-banner b{display:block;font-size:.75rem}.announcement-banner p{font-size:.63rem;line-height:1.35;opacity:.92;margin-top:3px}.announcement-banner small{font-size:.55rem;opacity:.72;display:block;margin-top:4px}
 .discover-card{height:207px;border-radius:20px;background:var(--primary);color:#fff;position:relative;overflow:hidden;display:flex;align-items:center;padding-left:17px;margin-bottom:22px}.discover-copy{width:62%;position:relative;z-index:2}.pill{font-size:.56rem;font-weight:800;letter-spacing:.5px;background:rgba(255,255,255,.15);padding:5px 8px;border-radius:20px}.discover-copy h2{font:700 1.03rem Poppins;line-height:1.32;margin:9px 0 14px}.discover-btn{border:0;background:var(--light-red);color:var(--primary);border-radius:10px;padding:9px 11px;font-size:.66rem;font-weight:800;display:flex;align-items:center;gap:5px}.discover-photo{position:absolute;right:-23px;width:55%;height:100%;border-radius:55% 0 0 55%;overflow:hidden;border-left:7px solid rgba(255,255,255,.13)}.discover-photo img{width:100%;height:100%;object-fit:cover}
@@ -573,4 +577,30 @@ button.payment-card{font:inherit;color:inherit;cursor:pointer;width:100%}
   .rotate-hint-card{display:flex;flex-direction:column;align-items:center;gap:16px}
   .rotate-hint-icon svg{width:56px;height:56px;fill:none;stroke:var(--secondary);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transform:rotate(90deg)}
   .rotate-hint-card b{font:700 1.05rem Poppins;letter-spacing:.3px}
+}
+
+/* ==========================================================================
+   FULLSCREEN — the app on a phone, not a phone in a page
+   --------------------------------------------------------------------------
+   The frame above is a desktop affordance: it shows the app at its natural
+   width inside a wide window. On the device the app actually ships to it is
+   wrong — a phone drawing a smaller, borderless phone inside itself, with the
+   dark backdrop and the rounded corners cropped by the real screen — and it
+   wastes a strip of screen on every edge. So the frame is dropped on the two
+   occasions the app is being used as an app:
+
+     · an installed app, whatever the screen size (the Trusted Web Activity in
+       the Play Store build reports display-mode: standalone), and
+     · a viewport narrow enough to be a phone, even in a browser.
+
+   Written last so it wins over the tablet rules above, which would otherwise
+   re-apply a 30px radius on a large installed screen.
+   ========================================================================== */
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui), (max-width: 480px){
+  html,body{min-height:100dvh}
+  body{padding:0;background:var(--screen)}
+  .app-viewport{
+    width:100%;height:100vh;height:100dvh;min-height:0;
+    border:0;border-radius:0;box-shadow:none;
+  }
 }

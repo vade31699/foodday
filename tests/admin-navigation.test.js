@@ -394,6 +394,31 @@ test("the bottom nav is hidden until a signed-in screen asks for it", () => {
   );
 });
 
+test("the phone frame is dropped when the app is used as an app", () => {
+  // The frame is a desktop affordance. On a phone it drew a smaller phone inside
+  // the real one, cropping the corners and wasting a strip on every edge.
+  const at = stylesCss.indexOf("@media (display-mode: standalone)");
+  assert.notEqual(at, -1, "the fullscreen media query is declared");
+
+  const prelude = stylesCss.slice(at, stylesCss.indexOf("{", at));
+  assert.match(prelude, /display-mode:\s*standalone/, "an installed app is detected");
+  assert.match(prelude, /max-width:\s*480px/, "and so is a phone-sized browser");
+
+  // It has to sit at the top level. Nested inside the rotate-hint query above it
+  // would be ANDed with "landscape on a touch device" and never apply.
+  const before = stylesCss.slice(0, at);
+  const depth = (before.match(/{/g) || []).length - (before.match(/}/g) || []).length;
+  assert.equal(depth, 0, "the fullscreen rule is not nested inside another block");
+
+  const block = stylesCss.slice(at, stylesCss.indexOf("\n}", at));
+  assert.match(block, /body\{padding:0/, "the page loses its backdrop padding");
+  assert.match(block, /\.app-viewport\{/, "and the frame is addressed");
+  assert.match(block, /border:0/, "with no border");
+  assert.match(block, /border-radius:0/, "no rounded corners");
+  assert.match(block, /box-shadow:none/, "no drop shadow");
+  assert.match(block, /height:100dvh/, "and it fills the screen height");
+});
+
 test("the Back button is sized to sit beside the search box", () => {
   assert.match(stylesCss, /\.order-toolbar\{[^}]*display:flex/, "the toolbar lays the two out in a row");
   assert.match(stylesCss, /\.toolbar-back\{[^}]*height:41px/, "the button matches the search box's height");

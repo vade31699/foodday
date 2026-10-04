@@ -14,7 +14,7 @@
 <!-- Bump the ?v= on styles.css and app.js in the same edit as either file: phones
      cache them hard, and a stale copy looks exactly like a bug that was never
      fixed. -->
-<link rel="stylesheet" href="styles.css?v=20261008">
+<link rel="stylesheet" href="styles.css?v=20261010">
 </head>
 <body>
 <div class="app-shell">
@@ -95,8 +95,10 @@
   <div class="header"><button class="back-btn" onclick="navigateTo('screen-onboarding')">‹</button><h2>Sign In</h2><span></span></div>
   <div class="content auth-content">
     <div class="form-stack">
-      <label>Email</label><input id="login-email" class="input" type="email" placeholder="Enter email" autocomplete="email">
-      <label>Password</label><input id="login-pass" class="input" type="password" placeholder="Enter password" autocomplete="current-password">
+      <label>Email</label><input id="login-email" class="input" type="email" placeholder="Enter email" autocomplete="email" oninput="clearLoginError()">
+      <label>Password</label><input id="login-pass" class="input" type="password" placeholder="Enter password" autocomplete="current-password" oninput="clearLoginError()">
+      <!-- A rejected sign-in belongs under the fields it is about, not in a sheet. -->
+      <p class="field-error" id="login-error" role="alert" aria-live="polite"></p>
     </div>
     <div class="forgot"><button onclick="openPasswordReset()">Forgot Password?</button></div>
     <button class="btn btn-primary" onclick="handleSignIn()">Sign In</button>
@@ -574,6 +576,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261008"></script>
+<script src="app.js?v=20261010"></script>
 </body>
 </html>
