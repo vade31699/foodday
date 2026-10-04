@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FOODAY</title>
+<link rel="icon" type="image/jpeg" href="fooday-logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600;6..96,700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+<!-- Bump the ?v= on styles.css and app.js in the same edit as either file: phones
+     cache them hard, and a stale copy looks exactly like a bug that was never
+     fixed. -->
+<link rel="stylesheet" href="styles.css?v=20261005">
+</head>
+<body>
+<div class="app-shell">
+<div class="app-viewport">
+
+<div id="toast" class="toast"></div>
+
+<!-- 1 SPLASH -->
+<section id="screen-splash" class="screen active splash-screen">
+  <div class="splash-logo-frame"><img src="fooday-logo.jpg" alt="FOODAY logo"></div>
+  <div class="brand-lockup">
+    <h1 id="splash-brand">FOODAY</h1>
+    <p id="splash-tagline">Good Food, Anytime, Anywhere. <span class="gold-heart">♥</span></p>
+  </div>
+  <button class="btn btn-white" onclick="navigateTo('screen-onboarding')">Get Started</button>
+</section>
+
+<!-- 2 ONBOARDING -->
+<section id="screen-onboarding" class="screen onboarding-screen">
+  <div class="topbar"><button class="back-btn" onclick="navigateTo('screen-splash')">‹</button><button class="skip-btn" onclick="navigateTo('screen-signin')">Skip</button></div>
+  <div class="rider-wrap">
+    <svg viewBox="0 0 440 330" role="img" aria-label="FOODAY delivery rider">
+      <circle cx="215" cy="150" r="128" fill="#FFF3D0"/>
+      <path d="M95 257h248" stroke="#F7BA3D" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="140" cy="250" r="32" fill="#2C2C2C"/><circle cx="140" cy="250" r="14" fill="#fff"/>
+      <circle cx="294" cy="250" r="32" fill="#2C2C2C"/><circle cx="294" cy="250" r="14" fill="#fff"/>
+      <path d="M124 224l28-77h95l45 77h-53l-30-48-22 48z" fill="#95222D"/>
+      <path d="M157 172l-32 46M235 175l42 43" stroke="#E5B18E" stroke-width="16" stroke-linecap="round"/>
+      <circle cx="204" cy="88" r="35" fill="#D89A72"/>
+      <path d="M168 84c3-32 20-49 46-49 26 0 44 17 49 45l-12 8-22-18-48 10z" fill="#2C2C2C"/>
+      <path d="M172 118h72l-5 68h-69z" fill="#FFFFFF"/>
+      <path d="M181 130h54v47h-54z" fill="#95222D"/>
+      <path d="M184 138h48v27h-48z" fill="#F7BA3D"/>
+      <text x="208" y="160" text-anchor="middle" font-family="Inter" font-size="22" font-weight="800" fill="#95222D">FD</text>
+      <path d="M236 126l37-35" stroke="#2C2C2C" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="278" cy="86" r="9" fill="#95222D"/>
+      <path d="M257 111l-18 35" stroke="#D89A72" stroke-width="14" stroke-linecap="round"/>
+      <rect x="270" y="118" width="92" height="78" rx="11" fill="#95222D"/>
+      <rect x="281" y="130" width="70" height="52" rx="7" fill="#FFF3D0"/>
+      <text x="316" y="164" text-anchor="middle" font-family="Poppins" font-size="28" font-weight="800" fill="#95222D">FD</text>
+      <path d="M122 216H82" stroke="#2C2C2C" stroke-width="7" stroke-linecap="round"/>
+      <path d="M86 203l-20 13 20 13" fill="none" stroke="#2C2C2C" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="onboarding-copy"><h2>Delicious food delivered to you</h2></div>
+  <div class="onboarding-bottom"><div class="dots"><i class="active"></i><i></i><i></i></div><button class="btn btn-primary" onclick="navigateTo('screen-signup')">Next</button></div>
+</section>
+
+<!-- 3 SIGN UP -->
+<section id="screen-signup" class="screen auth-screen">
+  <div class="header"><button class="back-btn" onclick="navigateTo('screen-onboarding')">‹</button><h2>Create Account</h2><span></span></div>
+  <div class="content auth-content">
+    <div class="form-stack">
+      <label>Full Name</label><input id="signup-name" class="input" placeholder="Enter your full name" autocomplete="name">
+      <label>Email</label><input id="signup-email" class="input" type="email" placeholder="Enter email" autocomplete="email">
+      <label>Phone Number</label><input id="signup-phone" class="input" type="tel" inputmode="numeric" maxlength="11" pattern="09[0-9]{9}" oninput="digitsOnly(this)" placeholder="Enter phone number">
+      <label>Password</label><input id="signup-pass" class="input" type="password" placeholder="Enter password" autocomplete="new-password" oninput="updatePasswordHint('signup-pass','signup-hint')">
+      <div class="pw-hint" id="signup-hint"></div>
+      <label>Confirm Password</label><input id="signup-confirm" class="input" type="password" placeholder="Confirm password" autocomplete="new-password">
+      <label>Delivery Address</label>
+      <div class="address-pick">
+        <textarea id="signup-address" class="input" rows="3" placeholder="Type your complete address"></textarea>
+        <button type="button" class="gps-btn" id="signup-gps-btn" onclick="requestPin('signup')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.6"></circle></svg>
+          <span>Use my current location</span>
+        </button>
+        <div id="signup-pin" class="pin-card" hidden></div>
+      </div>
+    </div>
+    <label class="check-row"><input id="terms-check" type="checkbox"><span>I agree to the Terms &amp; Conditions and Privacy Policy.</span></label>
+    <button class="btn btn-primary" onclick="handleSignUp()">Sign Up</button>
+    <p class="switch-auth">Already have an account? <button onclick="navigateTo('screen-signin')">Sign In</button></p>
+  </div>
+</section>
+
+<!-- 4 SIGN IN -->
+<section id="screen-signin" class="screen auth-screen">
+  <div class="header"><button class="back-btn" onclick="navigateTo('screen-onboarding')">‹</button><h2>Sign In</h2><span></span></div>
+  <div class="content auth-content">
+    <div class="form-stack">
+      <label>Email</label><input id="login-email" class="input" type="email" placeholder="Enter email" autocomplete="email">
+      <label>Password</label><input id="login-pass" class="input" type="password" placeholder="Enter password" autocomplete="current-password">
+    </div>
+    <div class="forgot"><button onclick="openPasswordReset()">Forgot Password?</button></div>
+    <button class="btn btn-primary" onclick="handleSignIn()">Sign In</button>
+    <p class="switch-auth">Don't have an account? <button onclick="navigateTo('screen-signup')">Create Account</button></p>
+  </div>
+</section>
+
+<!-- 5 HOME -->
+<section id="screen-home" class="screen user-screen">
+  <div class="home-header">
+    <div class="home-brand"><img src="fooday-logo.jpg" alt="FOODAY"><div><p id="home-greeting">Good to see you!</p><strong>What are you craving today?</strong></div></div>
+    <button class="header-icon" onclick="navigateTo('screen-profile')" aria-label="Profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4-6 8-6s6.5 2 8 6"></path></svg></button>
+  </div>
+  <div class="content home-content">
+    <div id="store-closed-banner" class="closed-banner" style="display:none"></div>
+    <div id="home-announcement" class="announcement-banner" style="display:none;"></div>
+    <div class="discover-card">
+      <div class="discover-copy">
+        <span class="pill">FOODAY PICKS</span>
+        <h2>Discover comfort food, refreshing drinks and new favorites!</h2>
+        <button class="discover-btn" onclick="navigateTo('screen-menu')">Go to Menu <svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></button>
+      </div>
+      <div class="discover-photo"><img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=900&q=90" alt="Fresh burger"></div>
+    </div>
+
+    <div class="section-head"><h3>Categories</h3><button onclick="navigateTo('screen-menu')">View all</button></div>
+    <div id="home-categories" class="category-grid"></div>
+
+    <div class="section-head"><h3>Popular Picks</h3><button onclick="navigateTo('screen-menu')">See all</button></div>
+    <div id="home-popular" class="horizontal-products"></div>
+  </div>
+</section>
+
+<!-- 6 MENU -->
+<section id="screen-menu" class="screen user-screen">
+  <div class="header"><button class="back-btn" onclick="navigateTo('screen-home')">‹</button><h2>Menu</h2><span></span></div>
+  <div class="content">
+    <div class="search-box"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input id="menu-search" placeholder="Search menu..." oninput="renderMenu()"></div>
+    <div id="menu-categories" class="filter-row"></div>
+    <div class="section-head"><h3 id="menu-heading">All Items</h3><span id="menu-count" class="muted"></span></div>
+    <div id="menu-list" class="product-list"></div>
+  </div>
+</section>
+
+<!-- 7 PRODUCT DETAIL -->
+<section id="screen-product" class="screen user-screen">
+  <div class="header"><button class="back-btn" onclick="navigateTo('screen-menu')">‹</button><h2>Product Details</h2><button id="favorite-btn" class="heart-btn" onclick="toggleFavorite()">♡</button></div>
+  <div class="content detail-content">
+    <div class="detail-photo"><img id="detail-image" alt="Product"></div>
+    <div class="detail-heading"><div><span id="detail-category" class="category-label"></span><h1 id="detail-name"></h1></div><strong id="detail-price"></strong></div>
+    <div class="rating"><span>★</span><b id="detail-rating">4.8</b><small id="detail-reviews">(120 reviews)</small></div>
+    <div id="detail-soldout" class="soldout-banner" style="display:none">Currently unavailable — please check back later.</div>
+    <p id="detail-description" class="detail-description"></p>
+    <div class="detail-widgets">
+      <div><span class="widget-icon">✦</span><b>Fresh</b></div>
+      <div><span class="widget-icon" id="widget-time">◷</span><b>Delivery</b><small id="detail-eta">30–45 min</small></div>
+      <div><span class="widget-icon">♨</span><b>Made to order</b></div>
+    </div>
+    <div class="note-card"><b>Special Note</b><input id="detail-note" class="input" placeholder="Enter a note for the kitchen"></div>
+    <div class="quantity-row"><b>Quantity</b><div class="quantity"><button onclick="changeDetailQty(-1)">−</button><span id="detail-qty">1</span><button onclick="changeDetailQty(1)">+</button></div></div>
+    <div class="buy-actions">
+      <button class="btn btn-primary add-cart-btn" id="detail-add-btn" onclick="addDetailToCart()"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.2 10.1a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 1.9-1.5L21 8H6"></path><circle cx="10" cy="20" r="1.2"></circle><circle cx="18" cy="20" r="1.2"></circle></svg><span>Add to Cart</span><strong id="detail-total">₱0.00</strong></button>
+      <button class="btn btn-buy" id="detail-buy-btn" onclick="buyNowDetail()"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"></path></svg><span>Buy Now</span><strong id="detail-buy-total">₱0.00</strong></button>
+    </div>
+  </div>
+</section>
+
+<!-- 8 CART -->
+<section id="screen-cart" class="screen user-screen">
+  <div class="header"><button class="back-btn" onclick="navigateTo('screen-menu')">‹</button><h2>My Cart</h2><button class="text-link" onclick="clearCart()">Clear</button></div>
+  <div id="cart-list" class="content cart-list"></div>
+  <div class="cart-bottom">
+    <div><span>Subtotal</span><b id="cart-subtotal">₱0.00</b></div>
+    <div><span>Delivery Fee</span><b>To be arranged</b></div>
+    <div class="total-line"><span>Total</span><strong id="cart-total">₱0.00</strong></div>
+    <button class="btn btn-primary" onclick="goCheckout()">Checkout</button>
+  </div>
+</section>
+
+<!-- 9 CHECKOUT -->
+<section id="screen-checkout" class="screen user-screen">
+  <div class="header"><button class="back-btn" onclick="checkoutBack()">‹</button><h2>Checkout</h2><span></span></div>
+  <div class="content">
+    <div class="buy-mode-banner" id="checkout-mode"></div>
+    <div class="form-card"><div class="card-title"><span>1</span><div><b>Delivery Information</b></div></div>
+      <div class="form-stack">
+        <label>Full Name</label><input id="checkout-name" class="input" placeholder="Enter your full name" autocomplete="name">
+        <label>Contact Number</label><input id="checkout-phone" class="input" maxlength="11" inputmode="numeric" pattern="09[0-9]{9}" oninput="digitsOnly(this)" placeholder="Enter phone number">
+        <label>Municipality / Area</label><select id="checkout-area" class="input"></select>
+        <label>Complete Address</label>
+        <div class="address-pick">
+          <textarea id="checkout-address" class="input" rows="3" placeholder="Enter complete address"></textarea>
+          <button type="button" class="gps-btn" id="checkout-gps-btn" onclick="requestPin('checkout')">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.6"></circle></svg>
+            <span>Use my current location</span>
+          </button>
+          <div id="checkout-pin" class="pin-card" hidden></div>
+        </div>
+        <label>Landmark (Optional)</label><input id="checkout-landmark" class="input" placeholder="Enter landmark">
+        <label>Order Note (Optional)</label><input id="checkout-note" class="input" placeholder="e.g. Less spicy, no onions">
+      </div>
+    </div>
+    <div class="form-card"><div class="card-title"><span>2</span><div><b>Order Summary</b><small id="checkout-item-count">No items yet</small></div></div>
+      <div id="checkout-summary" class="summary-lines"></div>
+    </div>
+    <div id="checkout-min-warning" class="min-warning" style="display:none"></div>
+    <button class="btn btn-primary" onclick="continueToPayment()">Continue to Payment</button>
+  </div>
+</section>
+
+<!-- 10 PAYMENT -->
+<section id="screen-payment" class="screen user-screen">
+  <div class="header"><button class="back-btn" onclick="navigateTo('screen-checkout')">‹</button><h2>Payment Method</h2><span></span></div>
+  <div class="content payment-content">
+    <p class="muted" id="payment-intro">Choose how you would like to pay. Please prepare your payment when your order arrives.</p>
+
+    <button class="payment-card selected" id="pay-cod" onclick="selectPayment('Cash on Delivery')">
+      <span class="pay-icon cod">₱</span>
+      <span><b>Cash on Delivery</b></span>
+      <i></i>
+    </button>
+
+    <div class="or-divider"><span>or</span></div>
+
+    <button class="payment-card locked" id="pay-gcash" onclick="notifyGcash()">
+      <span class="pay-icon gcash">G</span>
+      <span><b>GCash</b></span>
+      <em class="soon-badge">Coming soon</em>
+    </button>
+
+    <div class="payment-total"><span>Total Amount</span><strong id="payment-total">₱0.00</strong></div>
+    <button class="btn btn-primary" id="place-order-btn" onclick="placeOrder()">Place Order</button>
+  </div>
+</section>
+
+<!-- 11 CONFIRMATION -->
+<section id="screen-confirmation" class="screen confirmation-screen">
+  <div class="success-circle">✓</div>
+  <p class="eyebrow">Order Placed</p>
+  <h2>Thank you, <span id="confirm-name">there</span>!</h2>
+  <div class="confirmation-card">
+    <small>Order ID</small>
+    <strong id="confirm-id"></strong>
+    <div class="confirm-rows" id="confirm-rows"></div>
+    <span class="confirm-status">Current status: <b id="confirm-status">Order Placed</b></span>
+  </div>
+  <button class="btn btn-primary" onclick="openTracking(document.getElementById('confirm-id').textContent)">Track My Order</button>
+  <button class="btn btn-ghost" onclick="navigateTo('screen-orders')">View My Orders</button>
+</section>
+
+<!-- 12 ORDERS -->
+<section id="screen-orders" class="screen user-screen">
+  <div class="header"><h2>My Orders</h2><span></span></div>
+  <div class="content"><div id="order-filters" class="filter-row order-filters"></div><div id="orders-list" class="product-list"></div></div>
+</section>
+
+<!-- 13 TRACKING -->
+<section id="screen-tracking" class="screen user-screen">
+  <div class="header"><button class="back-btn" onclick="navigateTo('screen-orders')">‹</button><h2>Track Order</h2><span></span></div>
+  <div class="content">
+    <div id="tracking-card" class="tracking-card"></div>
+    <div id="tracking-timeline" class="tracking-card"></div>
+    <button id="cancel-order-btn" class="btn cancel-btn" onclick="askCancelOrder()">Cancel Order</button>
+  </div>
+</section>
+
+<!-- 14 PROFILE -->
+<section id="screen-profile" class="screen user-screen">
+  <div class="header"><h2>My Profile</h2><button class="header-icon" onclick="openEditProfile()">✎</button></div>
+  <div class="content profile-content">
+    <div class="profile-head"><button class="profile-avatar-btn" onclick="changeProfilePicture()"><img id="profile-image" alt="Profile photo"><span id="profile-letter">U</span><i>+</i></button><h2 id="profile-name">User</h2><p id="profile-email"></p><p id="profile-phone"></p></div>
+    <div class="profile-menu">
+      <button onclick="openEditProfile()"><span class="profile-icon red">✎</span><span><b>Edit Profile</b></span><i>›</i></button>
+      <button onclick="openAddresses()"><span class="profile-icon yellow">⌖</span><span><b>Addresses</b></span><i>›</i></button>
+      <button onclick="changeProfilePicture()"><span class="profile-icon gold">▣</span><span><b>Change Profile Picture</b></span><i>›</i></button>
+      <button onclick="openSecurityModal('user')"><span class="profile-icon maroon">🔒</span><span><b>Security</b></span><i>›</i></button>
+      <button onclick="showInfo('Help Center', helpCenterText())"><span class="profile-icon dark">?</span><span><b>Help Center</b></span><i>›</i></button>
+      <button class="logout-row" onclick="logoutUser()"><span class="profile-icon red">↪</span><span><b>Log Out</b></span><i>›</i></button>
+    </div>
+  </div>
+</section>
+
+<!-- ADMIN DASHBOARD -->
+<section id="screen-admin-dashboard" class="screen admin-screen">
+  <div class="admin-header"><h2>Dashboard</h2><button class="hamburger-btn" onclick="toggleAdminDrawer(true)" aria-label="Open menu" aria-controls="admin-drawer" aria-expanded="false"><span></span><span></span><span></span></button></div>
+  <div class="content admin-content">
+    <div class="stats-grid">
+      <div class="stat-card"><span>Products</span><strong id="stat-products">0</strong><i class="stat-icon red">▣</i></div>
+      <div class="stat-card"><span>Orders</span><strong id="stat-orders">0</strong><i class="stat-icon gold">▤</i></div>
+      <div class="stat-card"><span>Revenue</span><strong id="stat-revenue">₱0</strong><i class="stat-icon orange">₱</i></div>
+      <div class="stat-card"><span>To Accept</span><strong id="stat-pending">0</strong><i class="stat-icon yellow">◷</i></div>
+    </div>
+
+    <div class="admin-section-label incoming-label">Incoming Orders <span id="incoming-count" class="count-pill">0</span></div>
+    <div id="admin-incoming" class="product-list"></div>
+  </div>
+</section>
+
+<!-- ADMIN MENU: every management screen plus logout, behind one hamburger -->
+<div id="admin-drawer" class="admin-drawer" aria-hidden="true">
+  <div class="drawer-scrim" onclick="toggleAdminDrawer(false)"></div>
+  <nav class="drawer-panel" aria-label="Admin menu">
+    <div class="drawer-top">
+      <div class="drawer-who"><span id="drawer-avatar" class="drawer-avatar">A</span><div><b id="drawer-name">Admin</b></div></div>
+      <button class="drawer-close" onclick="toggleAdminDrawer(false)" aria-label="Close menu">×</button>
+    </div>
+    <div class="drawer-links">
+      <button onclick="adminGo('screen-admin-dashboard')"><span class="admin-icon maroon"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H3z"></path><path d="M9 21v-6h6v6"></path></svg></span><span><b>Dashboard</b></span><i>›</i></button>
+      <button onclick="adminGo('screen-admin-orders')"><span class="admin-icon maroon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M8 8h8M8 12h8M8 16h5"></path></svg></span><span><b>Orders</b></span><i>›</i></button>
+      <button onclick="adminGo('screen-admin-products')"><span class="admin-icon red"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8M8 13h5"></path></svg></span><span><b>Menu</b></span><i>›</i></button>
+      <button onclick="adminGo('screen-admin-categories')"><span class="admin-icon orange"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="M8 9h8M8 13h5"></path></svg></span><span><b>Categories</b></span><i>›</i></button>
+      <button onclick="adminGo('screen-admin-delivery')"><span class="admin-icon yellow"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5l3 2"></path></svg></span><span><b>Delivery Areas</b></span><i>›</i></button>
+      <button onclick="adminGo('screen-admin-announcements')"><span class="admin-icon gold"><svg viewBox="0 0 24 24"><path d="M4 14V9l12-4v13L4 14Z"></path><path d="M16 9l4-2v10l-4-2"></path></svg></span><span><b>Announcements</b></span><i>›</i></button>
+      <button onclick="adminGo('screen-admin-settings')"><span class="admin-icon maroon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M4 12h2m12 0h2M12 4v2m0 12v2"></path></svg></span><span><b>Settings</b></span><i>›</i></button>
+    </div>
+    <button class="drawer-logout" onclick="adminGo('__logout__')"><span class="admin-icon red">↪</span><span><b>Log Out</b></span><i>›</i></button>
+  </nav>
+</div>
+
+<!-- ADMIN PRODUCTS -->
+<section id="screen-admin-products" class="screen admin-screen">
+  <div class="header header-nav"><button class="back-btn" onclick="navigateTo('screen-admin-dashboard')" aria-label="Back to dashboard">‹</button><h2>Manage Menu</h2><button class="hamburger-btn" onclick="toggleAdminDrawer(true)" aria-label="Open admin menu" aria-controls="admin-drawer" aria-expanded="false"><span></span><span></span><span></span></button></div>
+  <div class="content admin-content">
+    <div class="admin-form-card">
+      <div class="card-title"><span class="form-icon" id="product-form-icon">+</span><div><b id="product-form-title">Add Food</b></div></div>
+      <div class="form-stack">
+        <label>Food Name</label><input id="product-name" class="input" placeholder="Enter food name">
+        <label>Price</label><input id="product-price" class="input" type="number" min="1" step="0.01" placeholder="Enter price">
+        <label>Category</label><select id="product-category" class="input"></select>
+        <label>Product Image</label>
+        <label class="file-picker"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><circle cx="9" cy="10" r="2"></circle><path d="m4 17 5-5 4 4 2-2 5 5"></path></svg><span id="product-file-name">Choose image from storage / album</span><input id="product-image-file" type="file" accept="image/*" onchange="previewProductImage(event)"></label>
+        <img id="product-image-preview" class="image-preview" alt="Product preview">
+        <label>Description</label><textarea id="product-description" class="input" rows="3" placeholder="Enter product description"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="product-submit-btn" onclick="submitProduct()">Add Product</button>
+        <button class="btn btn-ghost" id="product-cancel-btn" style="display:none" onclick="resetProductForm()">Cancel Edit</button>
+      </div>
+    </div>
+    <div class="admin-section-label">Existing Foods</div>
+    <div id="admin-products-list" class="product-list"></div>
+  </div>
+</section>
+
+<!-- ADMIN ORDERS -->
+<section id="screen-admin-orders" class="screen admin-screen">
+  <div class="header header-nav"><button class="back-btn" onclick="navigateTo('screen-admin-dashboard')" aria-label="Back to dashboard">‹</button><h2>Manage Orders</h2><button class="hamburger-btn" onclick="toggleAdminDrawer(true)" aria-label="Open admin menu" aria-controls="admin-drawer" aria-expanded="false"><span></span><span></span><span></span></button></div>
+  <div class="content admin-content">
+    <div class="order-toolbar">
+      <button class="toolbar-back" onclick="adminOrdersBack()" aria-label="Back">‹ Back</button>
+      <div class="search-box"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input id="admin-order-search" placeholder="Search order ID or customer..." oninput="renderAdminOrders()"></div>
+    </div>
+    <div id="admin-orders-scope" class="order-scope"></div>
+    <div id="admin-order-filters" class="filter-row"></div>
+    <div id="admin-orders-list" class="product-list"></div>
+  </div>
+</section>
+
+<!-- ADMIN SETTINGS: a menu of the account actions, each opening its own sheet -->
+<section id="screen-admin-settings" class="screen admin-screen">
+  <div class="header header-nav"><button class="back-btn" onclick="navigateTo('screen-admin-dashboard')" aria-label="Back to dashboard">‹</button><h2>Settings</h2><span></span></div>
+  <div class="content admin-content">
+    <div class="settings-menu">
+      <button onclick="openChangeEmail()"><span class="profile-icon red">✉</span><span><b>Change Email</b></span><i>›</i></button>
+      <button onclick="openAdminPasswordModal()"><span class="profile-icon maroon">🔒</span><span><b>Change Password</b></span><i>›</i></button>
+      <button onclick="openMfaModal('admin')"><span class="profile-icon gold">🛡</span><span><b>Two-Factor Authentication</b></span><i>›</i></button>
+      <button onclick="openPaymentSettings()"><span class="profile-icon yellow">₱</span><span><b>Payment Option</b></span><i>›</i></button>
+      <button onclick="openOtherSettings()"><span class="profile-icon dark">⚙</span><span><b>Other Settings</b></span><i>›</i></button>
+    </div>
+  </div>
+</section>
+
+<!-- ADMIN CATEGORIES -->
+<section id="screen-admin-categories" class="screen admin-screen">
+  <div class="header header-nav"><button class="back-btn" onclick="navigateTo('screen-admin-dashboard')" aria-label="Back to dashboard">‹</button><h2>Food Categories</h2><button class="hamburger-btn" onclick="toggleAdminDrawer(true)" aria-label="Open admin menu" aria-controls="admin-drawer" aria-expanded="false"><span></span><span></span><span></span></button></div>
+  <div class="content admin-content">
+    <div class="admin-form-card">
+      <div class="card-title"><span class="form-icon">+</span><div><b>Add Food Category</b></div></div>
+      <div class="form-stack"><label>Category Name</label><input id="new-category-name" class="input" placeholder="Enter category name"><label>Category Icon</label><input id="new-category-icon" class="input" placeholder="Enter an emoji or symbol"></div>
+      <button class="btn btn-primary" onclick="adminAddCategory()">Add Category</button>
+    </div>
+    <div class="admin-section-label">Existing Categories</div>
+    <div id="admin-category-list" class="category-admin-list"></div>
+  </div>
+</section>
+
+<!-- ADMIN DELIVERY -->
+<section id="screen-admin-delivery" class="screen admin-screen">
+  <div class="header header-nav"><button class="back-btn" onclick="navigateTo('screen-admin-dashboard')" aria-label="Back to dashboard">‹</button><h2>Delivery Areas</h2><button class="hamburger-btn" onclick="toggleAdminDrawer(true)" aria-label="Open admin menu" aria-controls="admin-drawer" aria-expanded="false"><span></span><span></span><span></span></button></div>
+  <div class="content admin-content">
+    <div class="admin-form-card"><div class="form-stack"><label>Area</label><input id="area-name" class="input" placeholder="Enter area or municipality"><label>Delivery Fee</label><input id="area-fee" class="input" type="number" min="0" step="0.01" inputmode="decimal" oninput="decimalOnly(this)" placeholder="Enter delivery fee"></div><button class="btn btn-primary" onclick="addDeliveryArea()">Save Area</button></div>
+    <div class="admin-section-label">Saved Areas</div>
+    <div id="delivery-list" class="product-list"></div>
+  </div>
+</section>
+
+<!-- ADMIN ANNOUNCEMENTS -->
+<section id="screen-admin-announcements" class="screen admin-screen">
+  <div class="header header-nav"><button class="back-btn" onclick="navigateTo('screen-admin-dashboard')" aria-label="Back to dashboard">‹</button><h2>Announcements</h2><button class="hamburger-btn" onclick="toggleAdminDrawer(true)" aria-label="Open admin menu" aria-controls="admin-drawer" aria-expanded="false"><span></span><span></span><span></span></button></div>
+  <div class="content admin-content">
+    <div class="admin-form-card">
+      <div class="card-title"><span class="form-icon">✦</span><div><b>Post Announcement</b></div></div>
+      <div class="form-stack"><label>Announcement Title</label><input id="announcement-title" class="input" placeholder="Enter announcement title"><label>Announcement Message</label><textarea id="announcement-message" class="input" rows="3" placeholder="Enter announcement message"></textarea><label>Celebration Icon</label><input id="announcement-icon" class="input" placeholder="👏"></div>
+      <button class="btn btn-primary" onclick="publishAnnouncement()">Post Announcement</button>
+    </div>
+    <div class="admin-section-label">Posted Announcements</div>
+    <div id="announcements-list" class="product-list"></div>
+  </div>
+</section>
+
+<!-- MODALS -->
+<div id="modal-edit-profile" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-edit-profile')">‹</button><h3>Edit Profile</h3><span></span></div><div class="modal-body">    <div class="form-stack"><label>Full Name</label><input id="edit-name" class="input" placeholder="Enter your full name"><label>Email</label><input id="edit-email" class="input" type="email" placeholder="Enter email"><label>Phone Number</label><input id="edit-phone" class="input" maxlength="11" inputmode="numeric" pattern="09[0-9]{9}" oninput="digitsOnly(this)" placeholder="Enter phone number"></div><button class="btn btn-primary" onclick="saveProfile()">Save Changes</button></div></div></div>
+
+<!-- SECURITY: one entry point, so the password and two-factor are chosen in one
+     place. It sits before the password sheets on purpose: those open on top of
+     it, and closing one comes back here. -->
+<div id="modal-security" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-security')">‹</button><h3>Security</h3><span></span></div><div class="modal-body">
+  <p id="security-intro">Protect your account with a password and a second step at sign-in.</p>
+  <div class="settings-card">
+    <button class="settings-action" onclick="securityOpenPassword()">
+      <span class="profile-icon maroon">🔒</span><span><b>Change Password</b><small id="security-pass-summary">Update it and sign out other devices</small></span><i>›</i>
+    </button>
+    <div class="settings-divider"></div>
+    <button class="settings-action" onclick="securityOpenMfa()">
+      <span class="profile-icon gold">🛡</span><span><b>Two-Factor Authentication</b><small id="security-mfa-summary">A one-time code is emailed at every sign-in</small></span><i>›</i>
+    </button>
+  </div>
+</div></div></div>
+
+<div id="modal-password" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-password')">‹</button><h3>Security</h3><span></span></div><div class="modal-body"><div class="form-stack"><label>Current Password</label><input id="pw-current" class="input" type="password" autocomplete="current-password" placeholder="Enter current password"><label>New Password</label><input id="pw-new" class="input" type="password" autocomplete="new-password" placeholder="Enter new password" oninput="updatePasswordHint('pw-new','pw-hint')"><div class="pw-hint" id="pw-hint"></div><label>Confirm New Password</label><input id="pw-confirm" class="input" type="password" autocomplete="new-password" placeholder="Confirm new password"></div><div class="pw-rules" id="pw-rules"></div><button class="btn btn-primary" onclick="submitPasswordChange()">Update Password</button></div></div></div>
+
+<div id="modal-admin-profile" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-admin-profile')">‹</button><h3>Edit Admin Profile</h3><span></span></div><div class="modal-body">    <div class="form-stack"><label>Full Name</label><input id="admin-edit-name" class="input" placeholder="Enter your full name"><label>Email</label><input id="admin-edit-email" class="input" type="email" placeholder="Enter email"><label>Phone Number</label><input id="admin-edit-phone" class="input" maxlength="11" inputmode="numeric" pattern="09[0-9]{9}" oninput="digitsOnly(this)" placeholder="0917 000 0000"></div><button class="btn btn-primary" onclick="saveAdminProfile()">Save Changes</button></div></div></div>
+
+<div id="modal-admin-password" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-admin-password')">‹</button><h3>Change Password</h3><span></span></div><div class="modal-body"><div class="form-stack"><label>Current Password</label><input id="admin-pw-current" class="input" type="password" autocomplete="current-password" placeholder="Enter current password"><label>New Password</label><input id="admin-pw-new" class="input" type="password" autocomplete="new-password" placeholder="Enter new password" oninput="updatePasswordHint('admin-pw-new','admin-pw-hint')"><div class="pw-hint" id="admin-pw-hint"></div><label>Confirm New Password</label><input id="admin-pw-confirm" class="input" type="password" autocomplete="new-password" placeholder="Confirm new password"></div><div class="pw-rules" id="admin-pw-rules"></div><button class="btn btn-primary" onclick="submitAdminPassword()">Update Password</button></div></div></div>
+
+<!-- ADMIN SETTINGS PANELS: one sheet per settings option -->
+<div id="modal-change-email" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-change-email')">‹</button><h3>Change Email</h3><span></span></div><div class="modal-body"><div class="form-stack"><label>Email</label><input id="admin-email-new" class="input" type="email" autocomplete="email" placeholder="Enter your email"></div><button class="btn btn-primary" onclick="submitAdminEmail()">Save Email</button></div></div></div>
+
+<div id="modal-payment-settings" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-payment-settings')">‹</button><h3>Payment Option</h3><span></span></div><div class="modal-body"><div class="settings-card">
+  <button class="toggle-row" data-setting="pay_cod_enabled" onclick="toggleSetting('pay_cod_enabled')"><span class="toggle-copy"><b>Cash on Delivery</b></span><span class="switch"><i></i></span></button>
+  <div class="settings-divider"></div>
+  <div class="toggle-row locked"><span class="toggle-copy"><b>GCash <em class="soon-badge">Coming soon</em></b></span><span class="switch locked"><i></i></span></div>
+</div><button class="btn btn-primary save-bar" onclick="saveSettings()">Save Changes</button></div></div></div>
+
+<div id="modal-other-settings" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-other-settings')">‹</button><h3>Other Settings</h3><span></span></div><div class="modal-body">
+  <div class="admin-section-label">Store</div>
+  <div class="settings-card">
+    <div class="form-stack">
+      <label>Store Name</label><input id="set-store_name" class="input" placeholder="FOODAY" oninput="markSettingsDirty()">
+      <label>Tagline</label><input id="set-store_tagline" class="input" placeholder="Good Food, Anytime, Anywhere." oninput="markSettingsDirty()">
+      <label>Support Email</label><input id="set-support_email" class="input" type="email" placeholder="support@fooday.ph" oninput="markSettingsDirty()">
+      <label>Support Phone</label><input id="set-support_phone" class="input" placeholder="0917 000 0000" oninput="markSettingsDirty()">
+    </div>
+    <div class="settings-divider"></div>
+    <button class="toggle-row" data-setting="store_open" onclick="toggleSetting('store_open')"><span class="toggle-copy"><b>Store is open</b></span><span class="switch"><i></i></span></button>
+  </div>
+
+  <div class="admin-section-label">Orders</div>
+  <div class="settings-card">
+    <button class="toggle-row" data-setting="order_auto_accept" onclick="toggleSetting('order_auto_accept')"><span class="toggle-copy"><b>Auto-accept orders</b></span><span class="switch"><i></i></span></button>
+    <div class="settings-divider"></div>
+    <div class="form-stack"><label>Preparation time (minutes)</label><input id="set-order_prep_minutes" class="input" type="number" min="5" max="240" oninput="markSettingsDirty()"></div>
+    <div class="settings-divider"></div>
+    <button class="toggle-row" data-setting="order_allow_cancel" onclick="toggleSetting('order_allow_cancel')"><span class="toggle-copy"><b>Allow customer cancellation</b></span><span class="switch"><i></i></span></button>
+    <div class="settings-divider"></div>
+    <div class="form-stack"><label>Cancellation window (minutes after ordering)</label><input id="set-order_cancel_window" class="input" type="number" min="0" max="1440" oninput="markSettingsDirty()"></div>
+    <div class="settings-divider"></div>
+    <div class="form-stack"><label>Minimum order value (₱)</label><input id="set-order_min_total" class="input" type="number" min="0" max="100000" step="1" oninput="markSettingsDirty()"></div>
+  </div>
+
+  <div class="admin-section-label">Privacy</div>
+  <div class="settings-card">
+    <button class="toggle-row" data-setting="privacy_show_contact" onclick="toggleSetting('privacy_show_contact')"><span class="toggle-copy"><b>Show customer contact details</b></span><span class="switch"><i></i></span></button>
+    <div class="settings-divider"></div>
+    <button class="toggle-row" data-setting="privacy_show_notes" onclick="toggleSetting('privacy_show_notes')"><span class="toggle-copy"><b>Show customer order notes</b></span><span class="switch"><i></i></span></button>
+  </div>
+
+  <div class="admin-section-label">Security</div>
+  <div class="settings-card">
+    <div class="form-stack two-col">
+      <div><label>Minimum password length</label><input id="set-password_min_length" class="input" type="number" min="6" max="32" oninput="markSettingsDirty()"></div>
+      <div><label>Max sign-in attempts</label><input id="set-login_max_attempts" class="input" type="number" min="3" max="20" oninput="markSettingsDirty()"></div>
+      <div><label>Lockout (minutes)</label><input id="set-login_lockout_minutes" class="input" type="number" min="1" max="1440" oninput="markSettingsDirty()"></div>
+      <div><label>Idle sign-out (minutes)</label><input id="set-session_idle_minutes" class="input" type="number" min="0" max="1440" oninput="markSettingsDirty()"></div>
+    </div>
+    <div class="settings-divider"></div>
+    <div class="toggle-row locked"><span class="toggle-copy"><b>Require letters and numbers</b></span><span class="switch on locked"><i></i></span></div>
+    <div class="settings-divider"></div>
+    <div class="toggle-row locked"><span class="toggle-copy"><b>Confirm password to save settings</b></span><span class="switch on locked"><i></i></span></div>
+  </div>
+
+  <div class="admin-section-label">Account</div>
+  <div class="settings-card">
+    <button class="settings-action" onclick="adminSignOutOthers()"><span class="profile-icon yellow">⇥</span><span><b>Sign out other devices</b></span><i>›</i></button>
+    <div class="settings-divider"></div>
+    <div class="settings-action static"><span class="profile-icon dark">🛡</span><span><b>Sign-in activity</b></span><i>›</i></div>
+    <div class="settings-divider"></div>
+    <button class="settings-action danger" onclick="clearLoginLog()"><span class="profile-icon red">⌫</span><span><b>Clear sign-in log</b></span><i>›</i></button>
+  </div>
+
+  <button class="btn btn-primary save-bar" onclick="saveSettings()">Save Changes</button>
+  <p class="save-hint" id="settings-hint">No changes yet.</p>
+</div></div></div>
+
+<div id="modal-cash" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-cash')">‹</button><h3>Collect Payment</h3><span></span></div><div class="modal-body"><p id="cash-intro">Collect the cash before completing this order.</p><div class="cash-due"><span>Amount to pay</span><b id="cash-due">₱0.00</b></div>        <div class="form-stack"><label>Cash received</label><input id="cash-received" class="input" type="text" inputmode="decimal" placeholder="0.00" oninput="decimalOnly(this); updateCashChange()"></div><div id="cash-quick" class="cash-quick"></div><div class="cash-change"><span>Change</span><b id="cash-change">₱0.00</b></div><div id="cash-hint" class="cash-hint"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="cancelCashCollection()">Not Yet</button><button class="btn btn-primary" onclick="confirmCashDelivery()">Complete Order</button></div></div></div></div>
+
+<div id="modal-cancel-order" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-cancel-order')">‹</button><h3>Cancel Order</h3><span></span></div><div class="modal-body"><p id="cancel-order-text">Are you sure you want to cancel this order?</p><div class="form-stack" id="cancel-reason-wrap"><label>Reason (optional)</label><input id="cancel-reason" class="input" placeholder="e.g. Ordered by mistake"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-cancel-order')">Keep Order</button><button class="btn btn-danger" onclick="confirmCancelOrder()">Yes, Cancel Order</button></div></div></div></div>
+
+<div id="modal-confirm-settings" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-confirm-settings')">‹</button><h3>Confirm Settings Save</h3><span></span></div><div class="modal-body"><div class="form-stack"><label>Admin Password</label><input id="confirm-settings-pass" class="input" type="password" autocomplete="current-password" placeholder="Enter your password"></div><button class="btn btn-primary" onclick="submitSettingsWithPassword()">Save Changes</button></div></div></div>
+
+<div id="modal-addresses" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-addresses')">‹</button><h3>Addresses</h3><span></span></div><div class="modal-body"><div id="address-list"></div><div class="settings-divider"></div><p class="address-limit-note" id="address-limit-note"></p><div class="form-stack"><label>Label</label><input id="new-address-label" class="input" placeholder="Home, Work, …"><label>New Address</label><div class="address-pick"><textarea id="new-address" class="input" rows="3" placeholder="Enter complete address"></textarea><button type="button" class="gps-btn" id="address-gps-btn" onclick="requestPin('saved')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.6"></circle></svg><span>Use my current location</span></button><div id="address-pin" class="pin-card" hidden></div></div><label>Landmark (Optional)</label><input id="new-landmark" class="input" placeholder="Enter landmark"></div><button class="btn btn-primary" id="save-address-btn" onclick="saveAddress()">Save Address</button></div></div></div>
+
+<!-- GPS: the browser's own prompt only appears once the customer has agreed here -->
+<div id="modal-location" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-location')">‹</button><h3>Use Your Location</h3><span></span></div><div class="modal-body"><p>Your phone will ask you to allow location access. FOODAY uses it once, to drop a pin on the map at your exact position so the rider finds you — it is saved with this address and never tracked afterwards.</p><div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-location')">Not Now</button><button class="btn btn-primary" id="modal-location-allow" onclick="allowPin()">Allow Location</button></div></div></div></div>
+
+<div id="modal-info" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-info')">‹</button><h3 id="info-title">Information</h3><span></span></div><div class="modal-body"><p id="info-body"></p><button class="btn btn-primary" onclick="closeModal('modal-info')">Done</button></div></div></div>
+
+<div id="modal-reset" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-reset')">‹</button><h3>Reset Password</h3><span></span></div><div class="modal-body"><div class="form-stack"><label>Email</label><input id="reset-email" class="input" type="email" placeholder="Enter email"><label>Mobile Number</label><input id="reset-phone" class="input" maxlength="11" inputmode="numeric" pattern="09[0-9]{9}" oninput="digitsOnly(this)" placeholder="Enter mobile number"><label>New Password</label><input id="reset-pass" class="input" type="password" placeholder="Enter new password" autocomplete="new-password" oninput="updatePasswordHint('reset-pass','reset-hint')"><div class="pw-hint" id="reset-hint"></div></div><button class="btn btn-primary" onclick="submitPasswordReset()">Reset Password</button></div></div></div>
+
+<input id="profile-file" type="file" accept="image/*" hidden onchange="saveProfilePicture(event)">
+<input id="admin-file" type="file" accept="image/*" hidden onchange="saveAdminPicture(event)">
+
+<!-- MFA: one modal serving the settings view, enrollment, and the sign-in challenge -->
+<div id="modal-mfa" class="modal"><div class="sheet"><div class="modal-header"><button class="back-btn" onclick="mfaBack()">‹</button><h3 id="mfa-title">Two-Factor Authentication</h3><span></span></div><div class="modal-body" id="mfa-body"></div></div></div>
+
+<!-- CONFIRMATION CODE: changing an email or password always emails a one-time
+     code to the address on file. One sheet serves both accounts and both kinds
+     of change, so the wording and the retry path never drift apart. It is
+     declared last on purpose: modals share one z-index, so the one written last
+     paints on top, and this sheet always has to sit above the form that
+     opened it. -->
+<div id="modal-change-code" class="modal"><div class="sheet compact"><div class="modal-header"><button class="back-btn" onclick="closeModal('modal-change-code')">‹</button><h3 id="change-code-title">Confirm the Change</h3><span></span></div><div class="modal-body"><p id="change-code-text"></p><div class="form-stack"><label>Verification code</label><input id="change-code-input" class="input mfa-code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000"></div><button class="btn btn-primary" onclick="submitChangeCode()">Confirm</button><p class="mfa-pending-note">Didn't get it? <button onclick="resendChangeCode()">Send a new code</button></p><p class="modal-note" id="change-code-hint"></p></div></div></div>
+
+<!-- CART TAB: docks to a screen edge, draggable to any height, on every customer screen -->
+<button id="cart-fab" class="cart-fab" type="button" data-edge="right" onclick="cartFabActivate(event)" aria-label="Open cart">
+  <span class="cart-fab-pulse" aria-hidden="true"></span>
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 10.1a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 1.9-1.5L21 8H6"></path><circle cx="10" cy="20" r="1.2"></circle><circle cx="18" cy="20" r="1.2"></circle></svg>
+  <span id="cart-count" class="cart-fab-badge">0</span>
+  <span class="cart-fab-grip" aria-hidden="true"></span>
+  <span class="cart-fab-hint" aria-hidden="true">Drag</span>
+</button>
+
+<nav id="bottom-nav" class="bottom-nav">
+  <button data-screen="screen-home" onclick="navigateTo('screen-home')"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H3z"></path><path d="M9 21v-6h6v6"></path></svg><span>Home</span></button>
+  <button data-screen="screen-menu" onclick="navigateTo('screen-menu')"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg><span>Menu</span></button>
+  <button data-screen="screen-orders" onclick="navigateTo('screen-orders')"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6z"></path><path d="M9 8h6M9 12h6M9 16h4"></path></svg><span>Orders</span></button>
+  <button data-screen="screen-favorites" onclick="navigateTo('screen-favorites')"><svg viewBox="0 0 24 24"><path d="M20.8 8.8c0 5.5-8.8 10.5-8.8 10.5S3.2 14.3 3.2 8.8A4.8 4.8 0 0 1 12 6a4.8 4.8 0 0 1 8.8 2.8Z"></path></svg><span>Favorites</span></button>
+  <button data-screen="screen-profile" onclick="navigateTo('screen-profile')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4-6 8-6s6.5 2 8 6"></path></svg><span>Profile</span></button>
+</nav>
+
+<section id="screen-favorites" class="screen user-screen">
+  <div class="header"><h2>Favorites</h2><span></span></div>
+  <div class="content"><div id="favorites-list" class="product-list"></div></div>
+</section>
+
+</div></div>
+
+<!-- MOBILE PORTRAIT LOCK: phones must stay upright. Tablets are wide enough in
+     landscape, so this overlay only appears on the short (phone) landscape
+     viewport and never on a tablet. -->
+<div id="rotate-hint" class="rotate-hint" role="alertdialog" aria-live="assertive">
+  <div class="rotate-hint-card">
+    <span class="rotate-hint-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5"></rect><path d="M10 4.5h4"></path></svg>
+    </span>
+    <b>Rotate your device</b>
+  </div>
+</div>
+
+<script src="app.js?v=20261005"></script>
+</body>
+</html>

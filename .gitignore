@@ -1,0 +1,7 @@
+# Secrets — never commit these
+.env
+
+# Local tooling
+node_modules/
+vendor/
+*.log
