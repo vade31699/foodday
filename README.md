@@ -134,9 +134,18 @@ be found.
    frontend build step, so delete any `npm run build` the dashboard pre-fills.
 4. **Deploy command:** leave it empty. Schema migrations run themselves on the
    first request (`api/migrations.php`).
-5. **Database:** attach a Laravel MySQL resource. It injects `DB_HOST`,
-   `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` — the exact names
-   `api/config.php` already reads, so nothing has to be mapped.
+5. **Database:** create or attach a **Laravel MySQL** database. Unlike Laravel
+   and Symfony, the generic PHP runtime does **not** inject `DB_*` for you, so
+   configure the connection yourself: either the five variables (`DB_HOST`,
+   `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`) or the single
+   `DATABASE_URL` (`mysql://user:pass@host:port/database`) the dashboard offers.
+   `DATABASE_URL` is read as a fallback for any of the five that is unset, so
+   pasting it alone is enough; the five individual variables always win.
+
+   A fresh managed database is empty. Before the first request, import
+   `fooday.sql` into it — and if the managed database has its own generated
+   name, drop the file's `CREATE DATABASE IF NOT EXISTS fooday_db` and
+   `USE fooday_db;` lines first, then set `DB_DATABASE` to that name.
 6. **Environment variables:** add the `MAIL_*` values and `MFA_PEPPER` from
    `.env.example`. They are set on the process, and `env()` reads the process
    environment before any file, so `.env` must not be deployed.

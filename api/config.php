@@ -42,12 +42,63 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
  * environment variables, and those always win) and only then from .env, so the
  * same code runs untouched on a laptop and in the cloud. The defaults keep a
  * stock WAMP/XAMPP install working with no configuration at all.
+ *
+ * A host may hand the database out as five separate variables or as one
+ * DATABASE_URL such as mysql://user:pass@host:3306/database. Both work: the
+ * separate variables win when both are present, and db_url_parts() fills in
+ * whatever the URL supplies when they are not.
  */
-define('DB_HOST', env('DB_HOST', '127.0.0.1'));
-define('DB_NAME', env('DB_DATABASE', 'fooday_db'));
-define('DB_USER', env('DB_USERNAME', 'root'));
-define('DB_PASS', env('DB_PASSWORD', ''));
-define('DB_PORT', env_int('DB_PORT', 3306));
+
+/**
+ * Split a DATABASE_URL into the parts db() needs.
+ *
+ * Only the mysql scheme is accepted: this app speaks MySQL through PDO, so a
+ * postgres:// URL is reported as unusable rather than mis-parsed into a
+ * connection that could never work. Returns [] when there is nothing usable,
+ * which leaves the local defaults in place.
+ *
+ * @return array{host?:string,port?:int,name?:string,user?:string,pass?:string}
+ */
+function db_url_parts(string $url): array
+{
+    $url = trim($url);
+    if ($url === '' || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'mysql') {
+        return [];
+    }
+
+    $parts = parse_url($url);
+    if (!is_array($parts)) {
+        return [];
+    }
+
+    $out = [];
+    if (!empty($parts['host'])) {
+        $out['host'] = (string) $parts['host'];
+    }
+    if (isset($parts['port'])) {
+        $out['port'] = (int) $parts['port'];
+    }
+    if (isset($parts['user']) && $parts['user'] !== '') {
+        $out['user'] = rawurldecode((string) $parts['user']);
+    }
+    if (isset($parts['pass'])) {
+        $out['pass'] = rawurldecode((string) $parts['pass']);
+    }
+    $name = ltrim((string) ($parts['path'] ?? ''), '/');
+    if ($name !== '') {
+        $out['name'] = rawurldecode($name);
+    }
+
+    return $out;
+}
+
+$db_url = db_url_parts(env('DATABASE_URL', ''));
+
+define('DB_HOST', env('DB_HOST', $db_url['host'] ?? '127.0.0.1'));
+define('DB_NAME', env('DB_DATABASE', $db_url['name'] ?? 'fooday_db'));
+define('DB_USER', env('DB_USERNAME', $db_url['user'] ?? 'root'));
+define('DB_PASS', env('DB_PASSWORD', $db_url['pass'] ?? ''));
+define('DB_PORT', env_int('DB_PORT', $db_url['port'] ?? 3306));
 const DB_CHARSET = 'utf8mb4';
 
 /* ---------------------------------------------------------------

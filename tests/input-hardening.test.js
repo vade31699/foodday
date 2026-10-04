@@ -215,11 +215,18 @@ test("a tablet in landscape is not caught by the phone rule", () => {
 /* ---------- deployment readiness ---------- */
 
 test("the database connection is environment-driven, with local defaults", () => {
-  assert.match(configPhp, /define\('DB_HOST', env\('DB_HOST', '127\.0\.0\.1'\)\)/, "DB_HOST comes from env()");
-  assert.match(configPhp, /define\('DB_NAME', env\('DB_DATABASE', 'fooday_db'\)\)/, "DB_DATABASE");
-  assert.match(configPhp, /define\('DB_USER', env\('DB_USERNAME', 'root'\)\)/, "DB_USERNAME");
-  assert.match(configPhp, /define\('DB_PASS', env\('DB_PASSWORD', ''\)\)/, "DB_PASSWORD");
+  assert.match(configPhp, /define\('DB_HOST', env\('DB_HOST',/, "DB_HOST comes from env()");
+  assert.match(configPhp, /define\('DB_NAME', env\('DB_DATABASE',/, "DB_DATABASE");
+  assert.match(configPhp, /define\('DB_USER', env\('DB_USERNAME',/, "DB_USERNAME");
+  assert.match(configPhp, /define\('DB_PASS', env\('DB_PASSWORD',/, "DB_PASSWORD");
   assert.match(configPhp, /;port=' \. DB_PORT \./, "the port is part of the DSN");
+  assert.match(configPhp, /env\('DB_HOST', \$db_url\['host'\] \?\? '127\.0\.0\.1'\)/, "with the local default as the fallback");
+});
+
+test("a single DATABASE_URL is accepted alongside the separate variables", () => {
+  assert.match(configPhp, /db_url_parts\(env\('DATABASE_URL', ''\)\)/, "the URL is parsed once into the defaults");
+  assert.match(configPhp, /function db_url_parts/, "the parser stands on its own");
+  assert.match(configPhp, /!== 'mysql'/, "only mysql:// URLs are accepted");
 });
 
 test("no query is built by string concatenation", () => {
