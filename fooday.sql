@@ -1,5 +1,5 @@
 -- ============================================================
---  FOODAY - Database schema v9 (MySQL / MariaDB)
+--  FOODAY - Database schema v10 (MySQL / MariaDB)
 -- ============================================================
 --  !!  THIS SCRIPT IS DESTRUCTIVE. IT DELETES EVERYTHING.      !!
 --  !!
@@ -385,6 +385,31 @@ CREATE TABLE change_codes (
   KEY idx_change_codes_lookup (actor_type, actor_id, purpose, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- A signup is held here, not in users, until the emailed code proves the
+-- address. The password arrives already bcrypt-hashed, and only a confirmed
+-- code creates the user row and its first address. One pending row per email;
+-- issuing a new code replaces the old one.
+CREATE TABLE signup_codes (
+  id            BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  email         VARCHAR(190)     NOT NULL,
+  code_hash     CHAR(64)         NOT NULL,
+  secret        CHAR(64)         NOT NULL,
+  name          VARCHAR(120)     NOT NULL,
+  phone         VARCHAR(11)      NOT NULL,
+  password_hash VARCHAR(255)     NOT NULL,
+  label         VARCHAR(40)      NOT NULL DEFAULT 'Home',
+  address       TEXT             NOT NULL,
+  landmark      VARCHAR(190)     NULL,
+  lat           DECIMAL(10,7)    NULL DEFAULT NULL,
+  lng           DECIMAL(10,7)    NULL DEFAULT NULL,
+  expires_at    DATETIME         NOT NULL,
+  attempts      TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  consumed_at   DATETIME         NULL,
+  created_at    TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_signup_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
 --  SEED DATA
 -- ============================================================
@@ -463,4 +488,4 @@ INSERT INTO settings (k, v) VALUES
 
 -- migration marker — must match FOODAY_SCHEMA_VERSION in api/migrations.php
 -- so a fresh import is already up to date and skips the migration pass.
-INSERT INTO fooday_meta (k, v) VALUES ('schema_version', '9');
+INSERT INTO fooday_meta (k, v) VALUES ('schema_version', '10');

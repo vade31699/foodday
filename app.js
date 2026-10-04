@@ -111,6 +111,20 @@ function decimalOnly(el) {
   if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, "");
   if (v !== el.value) el.value = v;
 }
+/* Show or hide a password field. The button carries the eye icon and the
+ * accessible label, so a screen reader hears "Show password" turn into "Hide
+ * password" and the pressed state matches what is on screen. */
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  if (btn) {
+    btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    btn.setAttribute("aria-pressed", show ? "true" : "false");
+    btn.classList.toggle("on", show);
+  }
+}
 function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function validPhone(v) { return /^09\d{9}$/.test(v); }
 function validName(v) { return /^[A-Za-z][A-Za-z\s.'-]*$/.test(v.trim()); }
@@ -695,7 +709,7 @@ function mfaCodesView(codes) {
 function mfaDisableView() {
   return `<p>Turning this off removes the emailed code at sign-in. Your password still protects the account.</p>
     <div class="form-stack"><label>Your password</label>
-      <input id="mfa-disable-pass" class="input" type="password" autocomplete="current-password" placeholder="Enter your password">
+      <span class="pw-field"><input id="mfa-disable-pass" class="input" type="password" autocomplete="current-password" placeholder="Enter your password"><button type="button" class="pw-eye" onclick="togglePasswordVisibility('mfa-disable-pass', this)" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.6"></circle><path class="pw-eye-slash" d="M4 4l16 16"></path></svg></button></span>
     </div>
     <button class="btn btn-danger" onclick="mfaConfirmDisable()">Turn Off Two-Factor</button>`;
 }
@@ -1112,19 +1126,63 @@ async function handleSignUp() {
 
   try {
     // The address goes in with the account and becomes the customer's default,
-    // so checkout starts from it without asking again.
-    await api("auth.php", {
+    // so checkout starts from it without asking again. Nothing is created yet:
+    // the server emails a code and only signup_verify() opens the account.
+    const res = await api("auth.php", {
       action: "signup", name, email, phone, password: pass, address,
       lat: pinned ? pinned.lat : null,
       lng: pinned ? pinned.lng : null
     });
-    await refreshStore();
+    if (res.verify_required) {
+      beginSignupCode(email, res.signup || {});
+      return;
+    }
+  } catch (e) { reportError(e); }
+}
+
+/* ---------- signup email verification ---------- */
+
+/* Creating an account emails a one-time code. The form is already validated and
+ * the details are held on the server, so this sheet only has to return the
+ * code; the account is created the moment it is correct. */
+let signupPendingEmail = "";
+
+function beginSignupCode(email, signup) {
+  signupPendingEmail = email;
+  const text = document.getElementById("signup-code-text");
+  if (text) text.innerHTML = `We emailed a 6-digit code to <b>${esc(signup.sent_to || email)}</b>. Enter it to finish creating your account.`;
+  document.getElementById("signup-code-input").value = "";
+  document.getElementById("signup-code-hint").textContent = "";
+  openModal("modal-signup-code");
+  document.getElementById("signup-code-input")?.focus();
+}
+
+async function submitSignupCode() {
+  const code = (document.getElementById("signup-code-input")?.value || "").replace(/\s+/g, "");
+  if (!code) { showAlert("Enter the code from your email.", "Verification Code"); return; }
+  if (!signupPendingEmail) return;
+  try {
+    await api("auth.php", { action: "signup_verify", email: signupPendingEmail, code });
+    closeModal("modal-signup-code");
+    signupPendingEmail = "";
     document.getElementById("signup-pass").value = ""; document.getElementById("signup-confirm").value = "";
     document.getElementById("signup-address").value = "";
     delete PINS.signup; renderPin("signup");
     updatePasswordHint("signup-pass", "signup-hint");
+    await refreshStore();
     toast("Account Created", `Good to see you, ${user().name}!`);
     navigateTo("screen-home");
+  } catch (e) { reportError(e); }
+}
+
+async function resendSignupCode() {
+  if (!signupPendingEmail) return;
+  try {
+    const res = await api("auth.php", { action: "signup_resend", email: signupPendingEmail });
+    const text = document.getElementById("signup-code-text");
+    if (text) text.innerHTML = `We emailed a 6-digit code to <b>${esc((res.signup && res.signup.sent_to) || signupPendingEmail)}</b>. Enter it to finish creating your account.`;
+    document.getElementById("signup-code-input").value = "";
+    document.getElementById("signup-code-hint").textContent = "A new code is on its way.";
   } catch (e) { reportError(e); }
 }
 

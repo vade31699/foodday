@@ -75,8 +75,8 @@ any PHP host:
   against MySQL, MariaDB or a MySQL-compatible cloud database such as
   [TiDB Cloud](#tidb-cloud).
 - **Mail** is read from the `MAIL_*` variables (see `.env.example`). Leaving
-  them unset is safe: two-factor enrolment is refused rather than leaving an
-  account that could never receive a code.
+  them unset is safe: two-factor enrolment and sign-up are refused rather than
+  leaving an account that could never receive a code.
 - **Sessions** use `Secure` cookies automatically behind HTTPS (including
   behind a proxy that sets `X-Forwarded-Proto`), with `HttpOnly` and
   `SameSite=Lax`.
@@ -219,8 +219,10 @@ be found.
 
 - **Customer:** create an account on the "Create Account" screen. A delivery
   address is part of signing up — type one, or pin your current location — and
-  it becomes the account's default address, so checkout starts from it. See
-  [Delivery addresses](#delivery-addresses).
+  it becomes the account's default address, so checkout starts from it. The
+  account is not created until a one-time code emailed to the address being
+  registered has come back, so nobody can register an address they cannot read.
+  See [Delivery addresses](#delivery-addresses).
 - **Forgot password:** on the Sign In screen, confirm the email and mobile
   number on the account, then choose a new password.
 - **Admin:** sign in on the normal **Sign In** page with
@@ -474,6 +476,17 @@ matter of taste rather than a matter of security.
   contain both letters and numbers (`password_problem()` in `api/config.php`);
   the client mirrors that in `passwordProblem()` so a form says it before the
   round trip.
+- **Creating an account proves the address.** A sign-up is held pending in
+  `signup_codes` (with an already-hashed password) and only a one-time code
+  emailed to the address creates the `users` row, so an account cannot be
+  opened around a mailbox its owner cannot read.
+- **Changing an email or password needs a code too.** Both always email a
+  one-time code to the address already on file, whether or not two-factor
+  sign-in is on, so a stolen session cannot move the account away from its
+  owner. Admin and customer use the same `change_codes` path.
+- **Every password field has a show/hide eye.** The field and its eye share one
+  wrapper (`.pw-field`), and the eye carries an accessible label that flips
+  between "Show password" and "Hide password" (`togglePasswordVisibility`).
 - Failed sign-ins are throttled per account and logged in `login_attempts`,
   with the recent attempts shown in the security panel.
 - Idle sessions time out; the session cookie is `HttpOnly` + `SameSite=Lax`
@@ -561,6 +574,19 @@ to are declared after it so closing them returns to Security. It then runs
 DOM to prove the account in view is the one that gets the password form and the
 two-factor state — the admin's, or the customer's, never the wrong one.
 
+**`signup-verify.test.js`** pins the emailed sign-up confirmation: the library
+emails and verifies a code, `auth.php` only reaches its `INSERT INTO users`
+through `signup_verify_code()`, and the `signup_codes` table ships in both
+`fooday.sql` and the migration. It then runs `beginSignupCode` and
+`submitSignupCode` through the real `app.js` in a fake DOM to show the sheet
+opens with the masked address and posts `signup_verify` with the code.
+
+**`password-eye.test.js`** checks that every `type="password"` input in
+`index.html` sits in a `.pw-field` with exactly one labelled eye, that the
+dynamically rendered two-factor password has one too, and that
+`togglePasswordVisibility` flips the field, the icon's slash and the accessible
+label together.
+
 **`admin-navigation.test.js`** covers the admin orders screen, where a dead end
 is most costly. It loads the real renderers against a small fake DOM built from
 `index.html`'s own screen ids, so navigation can be observed rather than assumed:
@@ -591,6 +617,8 @@ tests/
   address-validation.test.php   GPS pin rules and the ten-address limit
   order-pipeline.test.php       status transitions and the cash tender
   admin-navigation.test.js      ways out of a finished order and the admin menu
+  signup-verify.test.js         the emailed sign-up confirmation
+  password-eye.test.js          the show/hide eye on every password field
 ```
 
 ## Structure
@@ -605,12 +633,13 @@ app.js            frontend logic (talks to api/*.php)
 composer.json     no dependencies; present so PHP hosts detect the application
 public/
   index.php       front controller for a public/ document root (Laravel Cloud)
-fooday.sql        database schema (v9) + seed data. DESTRUCTIVE - see Setup
+fooday.sql        database schema (v10) + seed data. DESTRUCTIVE - see Setup
 api/
   config.php      PDO connection, session, settings, auth + order helpers
-  migrations.php  upgrades an existing database to v9 in place, without dropping
+  migrations.php  upgrades an existing database to v10 in place, without dropping
   bootstrap.php   loads session + catalog for the frontend
-  auth.php        signup / signin / logout / password reset
+  auth.php        signup (emailed code) / signin / logout / password reset
+  signup_codes.php holds and verifies the emailed sign-up confirmation
   admin.php       settings, profile, password, security report, stats
   products.php    admin add / edit / availability / delete products
   categories.php  admin add/delete categories
@@ -627,7 +656,7 @@ choice — because the app is loaded as plain scripts with no bundler.)
 
 | Endpoint | Actions |
 | --- | --- |
-| `auth.php` | `signup`, `signin`, `logout`, `reset_password`, `admin_logout` |
+| `auth.php` | `signup`, `signup_verify`, `signup_resend`, `signin`, `logout`, `reset_password`, `admin_logout` |
 | `admin.php` | `settings`, `save_settings`, `update_profile`, `change_password`, `signout_others`, `security_report`, `clear_login_log`, `stats` |
 | `orders.php` | `create`, `advance`, `update_status`, `note`, `cancel` |
 | `products.php` | `add`, `update`, `availability`, `delete` |
@@ -636,7 +665,11 @@ choice — because the app is loaded as plain scripts with no bundler.)
 
 `auth.php?action=signup` takes `name`, `email`, `phone`, `password`, `address`,
 and an optional `lat`/`lng` pair for a pinned location. A sign-up without an
-address is refused.
+address is refused. It creates nothing: the details are held pending and a
+one-time code is emailed to the address, returning `verify_required`.
+`signup_verify` then takes `email` and `code`, and only on a correct code does
+it create the account and its first address and sign the customer in.
+`signup_resend` re-sends the code to an address still waiting.
 
 `account.php?action=add_address` / `edit_address` take `label`, `address`,
 `landmark` and the same optional `lat`/`lng` pair. `add_address` answers `400`

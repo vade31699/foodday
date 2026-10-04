@@ -8,16 +8,17 @@ declare(strict_types=1);
  * v2 added (the order pipeline, the settings store, the order history
  * table, the security columns), v3 added (the cash-on-delivery
  * tender), v5 added (favorites, two-factor sign-in), v7 added
- * (the GPS point on a saved address) and v9 added (the emailed
- * confirmation codes for changing an email or password) is applied here
- * automatically the first time the app connects, so an existing install
- * keeps all of its data and never has to re-import fooday.sql.
+ * (the GPS point on a saved address), v9 added (the emailed
+ * confirmation codes for changing an email or password) and v10 added (the
+ * emailed confirmation code a new account must return before it exists) is
+ * applied here automatically the first time the app connects, so an existing
+ * install keeps all of its data and never has to re-import fooday.sql.
  *
  * The whole routine is idempotent and guarded by fooday_meta.schema_version,
  * so it costs one cheap SELECT per request.
  */
 
-const FOODAY_SCHEMA_VERSION = '9';
+const FOODAY_SCHEMA_VERSION = '10';
 
 /** @return array<int,string> */
 function fooday_all_tables(PDO $pdo): array
@@ -294,6 +295,31 @@ function fooday_migrate(PDO $pdo): void
         KEY idx_change_codes_lookup (actor_type, actor_id, purpose, id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    // A pending signup: the details are held here (never in users) until the
+    // emailed code proves the address, so no half-made account can sign in and
+    // an abandoned signup leaves nothing behind. The password is already a
+    // bcrypt hash, exactly as it would be stored on the user row.
+    fooday_create_table($pdo, "CREATE TABLE IF NOT EXISTS signup_codes (
+        id            BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+        email         VARCHAR(190)     NOT NULL,
+        code_hash     CHAR(64)         NOT NULL,
+        secret        CHAR(64)         NOT NULL,
+        name          VARCHAR(120)     NOT NULL,
+        phone         VARCHAR(11)      NOT NULL,
+        password_hash VARCHAR(255)     NOT NULL,
+        label         VARCHAR(40)      NOT NULL DEFAULT 'Home',
+        address       TEXT             NOT NULL,
+        landmark      VARCHAR(190)     NULL,
+        lat           DECIMAL(10,7)    NULL DEFAULT NULL,
+        lng           DECIMAL(10,7)    NULL DEFAULT NULL,
+        expires_at    DATETIME         NOT NULL,
+        attempts      TINYINT UNSIGNED NOT NULL DEFAULT 0,
+        consumed_at   DATETIME         NULL,
+        created_at    TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_signup_email (email)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     fooday_seed_settings($pdo);
 
     // Letters and numbers are now required of every password, so the setting
@@ -310,6 +336,7 @@ function fooday_migrate(PDO $pdo): void
     // are long dead, and rows whose account no longer exists.
     $pdo->exec("DELETE FROM mfa_codes WHERE expires_at < (NOW() - INTERVAL 1 DAY)");
     $pdo->exec("DELETE FROM change_codes WHERE expires_at < (NOW() - INTERVAL 1 DAY)");
+    $pdo->exec("DELETE FROM signup_codes WHERE expires_at < (NOW() - INTERVAL 1 DAY)");
     $pdo->exec("DELETE mfa_accounts FROM mfa_accounts
                   LEFT JOIN admins a ON a.id = mfa_accounts.actor_id AND mfa_accounts.actor_type = 'admin'
                   LEFT JOIN users u ON u.id = mfa_accounts.actor_id AND mfa_accounts.actor_type = 'user'

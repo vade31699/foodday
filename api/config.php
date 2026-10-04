@@ -10,6 +10,7 @@ require __DIR__ . '/migrations.php';
 require_once __DIR__ . '/env.php';
 require_once __DIR__ . '/mfa.php';
 require_once __DIR__ . '/change_codes.php';
+require_once __DIR__ . '/signup_codes.php';
 
 /* ---------------------------------------------------------------
  |  Session — hardened cookies + idle timeout

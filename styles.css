@@ -228,6 +228,17 @@ button.payment-card{font:inherit;color:inherit;cursor:pointer;width:100%}
 .mfa-hint{font-size:.58rem;color:var(--muted);line-height:1.5;margin-top:9px}
 .mfa-hint.warn{color:#A37A00}
 .mfa-code-input{letter-spacing:7px;font:700 1.15rem ui-monospace,Menlo,Consolas,monospace;text-align:center}
+
+/* Show/hide a password. The field and its eye share one relatively-positioned
+   wrapper, so the eye sits inside the input's right edge on every screen. */
+.pw-field{position:relative;display:block}
+.pw-field .input{padding-right:40px}
+.pw-eye{position:absolute;top:50%;right:6px;transform:translateY(-50%);width:28px;height:28px;padding:0;border:0;border-radius:50%;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.pw-eye svg{width:17px;height:17px}
+.pw-eye:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.pw-eye.on{color:var(--primary)}
+.pw-eye-slash{display:none}
+.pw-eye.on .pw-eye-slash{display:block}
 .mfa-pending-note{font-size:.6rem;color:var(--muted);text-align:center;margin-top:10px}
 .mfa-pending-note button{background:none;border:0;color:var(--primary);font-weight:800;font-size:.6rem;text-decoration:underline}
 .incoming-label{display:flex;align-items:center;gap:7px}

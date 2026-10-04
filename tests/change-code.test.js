@@ -62,7 +62,7 @@ test("moving an account to a new email verifies the emailed code, for both accou
 test("the schema ships the change_codes table", () => {
   assert.match(sql, /CREATE TABLE change_codes/, "a fresh import creates it");
   assert.match(migrationsPhp, /CREATE TABLE IF NOT EXISTS change_codes/, "an upgraded install gets it too");
-  assert.match(migrationsPhp, /const FOODAY_SCHEMA_VERSION = '9'/, "the version is bumped so an existing install upgrades");
+  assert.match(migrationsPhp, /const FOODAY_SCHEMA_VERSION = '10'/, "the version is bumped so an existing install upgrades");
 });
 
 /* ---------- the frontend routes every change through one sheet ---------- */

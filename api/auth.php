@@ -11,6 +11,14 @@ switch ($action) {
         signup($data);
         break;
 
+    case 'signup_verify':
+        signup_verify($data);
+        break;
+
+    case 'signup_resend':
+        signup_resend($data);
+        break;
+
     case 'signin':
         signin($data);
         break;
@@ -41,6 +49,12 @@ switch ($action) {
         throw new ApiError('Unknown auth action.', 400);
 }
 
+/**
+ * Starts a signup: validates the form, then emails a one-time code instead of
+ * creating anything. The account does not exist until signup_verify() has
+ * returned the code, so an address cannot be registered by someone who cannot
+ * read its mailbox.
+ */
 function signup(array $data): void
 {
     if (signup_throttled()) {
@@ -78,14 +92,65 @@ function signup(array $data): void
         throw new ApiError('An account with that email already exists.');
     }
 
-    // The user row and their first address go in together: an account with no
-    // address would leave the customer stuck at checkout with nothing saved.
+    $code = signup_request_code([
+        'email'         => $email,
+        'name'          => $name,
+        'phone'         => $phone,
+        'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+        'label'         => $address['label'],
+        'address'       => $address['address'],
+        'landmark'      => $address['landmark'],
+        'lat'           => $address['lat'],
+        'lng'           => $address['lng'],
+    ]);
+
+    // Counts toward the per-device account cap; the check happens above, before
+    // this request is recorded, so the 11th attempt in an hour is the one refused.
+    login_record('signup:' . client_ip(), false);
+
+    ok(['verify_required' => true, 'signup' => $code]);
+}
+
+/**
+ * Finishes a signup: verifies the emailed code, then creates the user row and
+ * their first address together and signs them in. The pending details are the
+ * only source of what is written, never the request, so the form cannot be
+ * edited between asking for the code and using it.
+ */
+function signup_verify(array $data): void
+{
+    $email = strtolower(field($data, 'email'));
+    if (!valid_email($email)) {
+        throw new ApiError('Please enter a valid email address.');
+    }
+
+    $pending = signup_verify_code($email, field($data, 'code'));
+
+    $pdo = db();
+    // Someone else may have taken the address while this code was in flight.
+    $exists = $pdo->prepare('SELECT id FROM users WHERE email = ?');
+    $exists->execute([$email]);
+    if ($exists->fetch()) {
+        throw new ApiError('An account with that email already exists.');
+    }
+
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare('INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)');
-        $stmt->execute([$name, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
+        $stmt->execute([
+            (string) $pending['name'],
+            $email,
+            (string) $pending['phone'],
+            (string) $pending['password_hash'],
+        ]);
         $userId = (int) $pdo->lastInsertId();
-        address_insert($pdo, $userId, $address, true);
+        address_insert($pdo, $userId, [
+            'label'    => (string) $pending['label'],
+            'address'  => (string) $pending['address'],
+            'landmark' => $pending['landmark'] === null ? null : (string) $pending['landmark'],
+            'lat'      => $pending['lat'] === null ? null : (float) $pending['lat'],
+            'lng'      => $pending['lng'] === null ? null : (float) $pending['lng'],
+        ], true);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -96,6 +161,27 @@ function signup(array $data): void
 
     sign_in_user($pdo, $userId);
     ok(['user' => current_user()]);
+}
+
+/** Emails a fresh signup code, replacing any earlier one. */
+function signup_resend(array $data): void
+{
+    $email = strtolower(field($data, 'email'));
+    if (!valid_email($email)) {
+        throw new ApiError('Please enter a valid email address.');
+    }
+    if ($wait = login_is_blocked('signup:' . $email)) {
+        throw new ApiError('Too many attempts. Please try again in ' . (int) ceil($wait / 60) . ' minutes.', 429);
+    }
+
+    $pending = signup_pending(db(), $email);
+    if ($pending === null) {
+        throw new ApiError('There is no signup waiting for this email. Please fill in the form again.');
+    }
+
+    $code = signup_request_code($pending);
+    login_record('signup:' . $email, false);
+    ok(['signup' => $code]);
 }
 
 function signin(array $data): void
