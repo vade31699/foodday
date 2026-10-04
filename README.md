@@ -484,6 +484,13 @@ matter of taste rather than a matter of security.
   one-time code to the address already on file, whether or not two-factor
   sign-in is on, so a stolen session cannot move the account away from its
   owner. Admin and customer use the same `change_codes` path.
+- **Every emailed code is six digits with no spaces, and single-use.** It is
+  emailed as plain `043921`, stays valid for `MFA_CODE_TTL_MINUTES` (10 by
+  default) and is retired the moment it is used once. A wrong entry is only
+  refused — it does not count as an attempt and does not end the code — and a
+  fresh code can be requested only once the current one is at least
+  `CODE_RESEND_COOLDOWN_MINUTES` (3 by default) old, which is what limits
+  resend spam. The cooldown is shared by two-factor, sign-up and change codes.
 - **Every password field has a show/hide eye.** The field and its eye share one
   wrapper (`.pw-field`), and the eye carries an accessible label that flips
   between "Show password" and "Hide password" (`togglePasswordVisibility`).
@@ -505,11 +512,12 @@ node --test                             # all JS tests             (Node 18+)
 php tests/address-validation.test.php   # address validation       (PHP 8+)
 php tests/order-pipeline.test.php       # statuses and cash tender (PHP 8+)
 php tests/password-policy.test.php      # the fixed password rules (PHP 8+)
+php tests/email-code.test.php           # the one-time code policy     (PHP 8+)
 ```
 
 `node --test` with no arguments finds every `tests/*.test.js` on its own.
 
-The three PHP files share `tests/harness.php` — a few `expect_*` helpers, and a
+The PHP files share `tests/harness.php` — a few `expect_*` helpers, and a
 `finish()` that prints the tally and exits non-zero when anything failed. They
 load the real `api/config.php` with no database at all: `db()` is only ever
 called lazily, so the decision logic underneath the SQL can be exercised alone.
@@ -581,6 +589,12 @@ through `signup_verify_code()`, and the `signup_codes` table ships in both
 `submitSignupCode` through the real `app.js` in a fake DOM to show the sheet
 opens with the masked address and posts `signup_verify` with the code.
 
+**`email-code.test.php`** covers the emailed one-time code policy without a
+database: `mfa_format_code` returns six digits with no spaces, the resend
+cooldown defaults to three minutes and is clamped, each request path
+(two-factor, sign-up, change) calls the cooldown, none of the verification
+paths increments an attempts counter, and every code is still consumed on use.
+
 **`password-eye.test.js`** checks that every `type="password"` input in
 `index.html` sits in a `.pw-field` with exactly one labelled eye, that the
 dynamically rendered two-factor password has one too, and that
@@ -619,6 +633,7 @@ tests/
   admin-navigation.test.js      ways out of a finished order and the admin menu
   signup-verify.test.js         the emailed sign-up confirmation
   password-eye.test.js          the show/hide eye on every password field
+  email-code.test.php           the no-space, single-use, 3-minute code policy
 ```
 
 ## Structure

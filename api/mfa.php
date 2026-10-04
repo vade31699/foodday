@@ -17,10 +17,11 @@ declare(strict_types=1);
  *   1. The password must already be correct. A code is useless alone.
  *   2. Codes live ~10 minutes and are single-use. A new code supersedes any
  *      earlier one, so an old email stops working the moment a new one is sent.
- *   3. Each challenge tolerates a handful of wrong codes, then dies and has to
- *      be re-requested. Failures are also counted per address through the same
- *      login_attempts table the password uses, so guessing is rate limited
- *      even across many challenges.
+ *   3. A wrong entry is simply refused: it does not count against the code and
+ *      never retires it, so the code stays usable until it is used once or it
+ *      expires. What limits guessing is that a fresh code may only be requested
+ *      every few minutes (see code_resend_cooldown_minutes()), so the code
+ *      space cannot be walked at speed.
  *   4. Codes are stored as HMAC-SHA256 digests, never in the clear, so a
  *      database dump cannot be walked to recover a live code.
  *
@@ -47,9 +48,47 @@ function mfa_code_ttl_minutes(): int
     return max(2, min(60, env_int('MFA_CODE_TTL_MINUTES', 10)));
 }
 
-function mfa_max_attempts(): int
+/**
+ * How long an existing code must sit before another may be requested for the
+ * same account. Wrong entries never retire a code, so this cooldown — not an
+ * attempts budget — is what keeps the inbox from being hammered.
+ */
+function code_resend_cooldown_minutes(): int
 {
-    return max(3, min(10, env_int('MFA_CODE_MAX_ATTEMPTS', 5)));
+    return max(0, min(60, env_int('CODE_RESEND_COOLDOWN_MINUTES', 3)));
+}
+
+/**
+ * Seconds left before a new code may be requested for the same key, or 0 when
+ * one may be requested now. `$sql` must return the age in seconds of the most
+ * recent *live* code for the key (or NULL/false when there is none), so a code
+ * that was already used or has expired never blocks a fresh request.
+ *
+ * @param array<int,mixed> $params
+ */
+function code_reissue_wait(PDO $pdo, string $sql, array $params): int
+{
+    $cooldown = code_resend_cooldown_minutes();
+    if ($cooldown <= 0) {
+        return 0;
+    }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $age = $stmt->fetchColumn();
+    if ($age === false || $age === null || $age === '') {
+        return 0;
+    }
+    return max(0, $cooldown * 60 - (int) $age);
+}
+
+/** The refusal raised while the code already sent is still too new to replace. */
+function code_reissue_error(int $wait): ApiError
+{
+    $minutes = max(1, (int) ceil($wait / 60));
+    return new ApiError(
+        'A code was just sent. Please wait about ' . $minutes . ' minute' . ($minutes === 1 ? '' : 's')
+        . ' before requesting another one.'
+    );
 }
 
 function mfa_recovery_code_count(): int
@@ -121,10 +160,10 @@ function mfa_generate_code(): string
     return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 }
 
-/** Formats a code for humans: 043921 -> "043 921". */
+/** The code as it is emailed and typed: six digits, no spaces. */
 function mfa_format_code(string $code): string
 {
-    return trim(chunk_split($code, 3, ' '));
+    return preg_replace('/\D/', '', $code) ?? $code;
 }
 
 function mfa_hash_code(string $code, string $secret): string
@@ -261,6 +300,21 @@ function mfa_start_enrollment(array $actor): array
         throw new ApiError('Two-factor sign-in is already switched on for this account.');
     }
 
+    // A setup code that was just emailed is not replaced yet. It lives on the
+    // account row rather than in mfa_codes, so its age is derived from its
+    // expiry — computed by MySQL, so it never drifts against PHP's clock.
+    $wait = code_reissue_wait(
+        $pdo,
+        'SELECT TIMESTAMPDIFF(SECOND, DATE_SUB(pending_expires_at, INTERVAL ? MINUTE), NOW())
+           FROM mfa_accounts
+          WHERE actor_type = ? AND actor_id = ?
+            AND pending_expires_at IS NOT NULL AND pending_expires_at > NOW()',
+        [mfa_code_ttl_minutes(), $actor['type'], $actor['id']]
+    );
+    if ($wait > 0) {
+        throw code_reissue_error($wait);
+    }
+
     $code = mfa_generate_code();
     $up = $pdo->prepare(
         'UPDATE mfa_accounts
@@ -388,13 +442,56 @@ function mfa_bump_auth_version(PDO $pdo, array $actor): void
  * --------------------------------------------------------------- */
 
 /**
+ * The live sign-in code still waiting for this actor, with its age and the
+ * seconds left before it expires. NULL when there is none (used, replaced or
+ * expired).
+ *
+ * @return array{age_secs:int,left_secs:int}|null
+ */
+function mfa_live_challenge(PDO $pdo, string $type, int $id): ?array
+{
+    $stmt = $pdo->prepare(
+        'SELECT TIMESTAMPDIFF(SECOND, created_at, NOW()) AS age_secs,
+                TIMESTAMPDIFF(SECOND, NOW(), expires_at)  AS left_secs
+           FROM mfa_codes
+          WHERE actor_type = ? AND actor_id = ? AND consumed_at IS NULL AND expires_at > NOW()
+          ORDER BY id DESC LIMIT 1'
+    );
+    $stmt->execute([$type, $id]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+/**
  * Issues a fresh sign-in code and retires every earlier one, so only the most
  * recent email can be used.
  *
+ * With $reuseLive true — the sign-in path — a code already sent a moment ago
+ * is handed back instead of being replaced, so a second attempt within the
+ * resend cooldown still lands on the code step rather than being refused. With
+ * it false — an explicit "send a new code" — a too-recent code is refused, so
+ * the inbox cannot be flooded.
+ *
  * @return array{sent:bool,reason:string,masked:string,expires_in:int}
  */
-function mfa_issue_challenge(PDO $pdo, array $actor, string $secret): array
+function mfa_issue_challenge(PDO $pdo, array $actor, string $secret, bool $reuseLive = false): array
 {
+    $live = mfa_live_challenge($pdo, $actor['type'], $actor['id']);
+    if ($live !== null) {
+        $wait = max(0, code_resend_cooldown_minutes() * 60 - (int) $live['age_secs']);
+        if ($wait > 0) {
+            if ($reuseLive) {
+                return [
+                    'sent'       => true,
+                    'reason'     => '',
+                    'masked'     => mask_email($actor['email']),
+                    'expires_in' => max(1, (int) ceil(((int) $live['left_secs']) / 60)),
+                ];
+            }
+            throw code_reissue_error($wait);
+        }
+    }
+
     mfa_delete_challenges($pdo, $actor['type'], $actor['id']);
 
     $code = mfa_generate_code();
@@ -477,21 +574,12 @@ function mfa_verify_code(PDO $pdo, array $actor, string $input, bool $allowRecov
         mfa_delete_challenges($pdo, $actor['type'], $actor['id']);
         return ['ok' => false, 'reason' => 'That code has expired. Request a new one.', 'recovery_used' => false];
     }
-    if ((int) $challenge['attempts'] >= mfa_max_attempts()) {
-        mfa_delete_challenges($pdo, $actor['type'], $actor['id']);
-        return ['ok' => false, 'reason' => 'Too many wrong codes. Request a new one.', 'recovery_used' => false];
-    }
 
+    // A wrong entry never counts against the code and never retires it: the
+    // code stays live until it is used once, replaced by a newer one, or it
+    // expires. Requesting a replacement is what the resend cooldown limits.
     if (!hash_equals((string) $challenge['code_hash'], mfa_hash_code($input, $secret))) {
-        $pdo->prepare('UPDATE mfa_codes SET attempts = attempts + 1 WHERE id = ?')->execute([(int) $challenge['id']]);
-        $left = mfa_max_attempts() - ((int) $challenge['attempts'] + 1);
-        return [
-            'ok' => false,
-            'reason' => $left > 0
-                ? "That code is not correct. $left attempt" . ($left === 1 ? '' : 's') . ' left.'
-                : 'Too many wrong codes. Request a new one.',
-            'recovery_used' => false,
-        ];
+        return ['ok' => false, 'reason' => 'That code is not correct. Check your email and try again.', 'recovery_used' => false];
     }
 
     mfa_consume_challenge($pdo, (int) $challenge['id']);

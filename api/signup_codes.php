@@ -68,6 +68,21 @@ function signup_request_code(array $signup): array
     }
 
     $pdo = db();
+
+    // A live code may not be replaced for a few minutes, so "send a new code"
+    // cannot be used to flood the inbox.
+    $wait = code_reissue_wait(
+        $pdo,
+        'SELECT TIMESTAMPDIFF(SECOND, created_at, NOW())
+           FROM signup_codes
+          WHERE email = ? AND consumed_at IS NULL AND expires_at > NOW()
+          ORDER BY id DESC LIMIT 1',
+        [$email]
+    );
+    if ($wait > 0) {
+        throw code_reissue_error($wait);
+    }
+
     $secret = mfa_new_secret();
     $code   = mfa_generate_code();
 
@@ -129,20 +144,11 @@ function signup_verify_code(string $email, string $input): array
         signup_code_clear($pdo, $email);
         throw new ApiError('That code has expired. Request a new one.');
     }
-    if ((int) $row['attempts'] >= mfa_max_attempts()) {
-        signup_code_clear($pdo, $email);
-        throw new ApiError('Too many wrong codes. Request a new one.');
-    }
 
+    // A wrong entry never counts against the code and never retires it — only a
+    // correct one consumes it, and the resend cooldown limits replacements.
     if (!hash_equals((string) $row['code_hash'], mfa_hash_code($input, (string) $row['secret']))) {
-        $pdo->prepare('UPDATE signup_codes SET attempts = attempts + 1 WHERE id = ?')
-            ->execute([(int) $row['id']]);
-        $left = mfa_max_attempts() - ((int) $row['attempts'] + 1);
-        throw new ApiError(
-            $left > 0
-                ? 'That code is not correct. ' . $left . ' ' . ($left === 1 ? 'attempt' : 'attempts') . ' left.'
-                : 'Too many wrong codes. Request a new one.'
-        );
+        throw new ApiError('That code is not correct. Check your email and try again.');
     }
 
     // Single use: gone the moment it has created one account.

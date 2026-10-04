@@ -163,15 +163,16 @@ function signup_verify(array $data): void
     ok(['user' => current_user()]);
 }
 
-/** Emails a fresh signup code, replacing any earlier one. */
+/**
+ * Emails a fresh signup code, replacing any earlier one. How often this may be
+ * done is decided by the resend cooldown inside signup_request_code(), so a
+ * wrong code never counts as an attempt here.
+ */
 function signup_resend(array $data): void
 {
     $email = strtolower(field($data, 'email'));
     if (!valid_email($email)) {
         throw new ApiError('Please enter a valid email address.');
-    }
-    if ($wait = login_is_blocked('signup:' . $email)) {
-        throw new ApiError('Too many attempts. Please try again in ' . (int) ceil($wait / 60) . ' minutes.', 429);
     }
 
     $pending = signup_pending(db(), $email);
@@ -180,7 +181,6 @@ function signup_resend(array $data): void
     }
 
     $code = signup_request_code($pending);
-    login_record('signup:' . $email, false);
     ok(['signup' => $code]);
 }
 
@@ -261,7 +261,10 @@ function mfa_hold_for_code(PDO $pdo, array $actor): void
         throw new ApiError('Two-factor sign-in could not be read for this account.', 500);
     }
 
-    $challenge = mfa_issue_challenge($pdo, $actor, (string) $account['secret']);
+    // A code sent a moment ago is reused rather than replaced: signing in is not
+    // a request for a new code, so a second attempt inside the resend cooldown
+    // must still reach the code step.
+    $challenge = mfa_issue_challenge($pdo, $actor, (string) $account['secret'], true);
 
     session_regenerate_id(true);
     $_SESSION['mfa_pending'] = [
@@ -322,19 +325,14 @@ function mfa_verify_signin(array $data): void
     $actor = mfa_pending_actor($pdo);
     $email = $actor['email'];
 
-    if ($wait = login_is_blocked('mfa:' . $email)) {
-        throw new ApiError(
-            'Too many wrong codes. Please try again in ' . (int) ceil($wait / 60) . ' minutes.',
-            429
-        );
-    }
-
+    // A wrong code is simply refused: it is not counted as an attempt, and the
+    // live code is never retired by it. Only the resend cooldown limits how
+    // often a new code can be asked for.
     $check = mfa_verify_code($pdo, $actor, trim(field($data, 'code')) ?: trim(field($data, 'recovery_code')));
     if (!$check['ok']) {
-        login_record('mfa:' . $email, false);
         throw new ApiError($check['reason'], 401);
     }
-    login_record('mfa:' . $email, true);
+    login_record($email, true);
 
     // The code is good, so the sign-in is now allowed to finish. Clearing the
     // hold before sign_in_* regenerates the id keeps the old id unusable.
@@ -364,13 +362,6 @@ function mfa_resend_code(): void
 {
     $pdo = db();
     $actor = mfa_pending_actor($pdo);
-
-    if ($wait = login_is_blocked('mfa:' . $actor['email'])) {
-        throw new ApiError(
-            'Too many attempts. Please try again in ' . (int) ceil($wait / 60) . ' minutes.',
-            429
-        );
-    }
 
     $account = mfa_account($pdo, $actor['type'], $actor['id']);
     if ($account === null) {

@@ -66,6 +66,21 @@ function change_request_code(array $actor, string $purpose): array
         throw new ApiError('Account not found.', 404);
     }
 
+    // A live code may not be replaced for a few minutes, so "send a new code"
+    // cannot be used to flood the inbox.
+    $wait = code_reissue_wait(
+        $pdo,
+        'SELECT TIMESTAMPDIFF(SECOND, created_at, NOW())
+           FROM change_codes
+          WHERE actor_type = ? AND actor_id = ? AND purpose = ?
+            AND consumed_at IS NULL AND expires_at > NOW()
+          ORDER BY id DESC LIMIT 1',
+        [$actor['type'], $actor['id'], $purpose]
+    );
+    if ($wait > 0) {
+        throw code_reissue_error($wait);
+    }
+
     $code = mfa_generate_code();
     change_codes_clear($pdo, $actor['type'], $actor['id'], $purpose);
     $pdo->prepare(
@@ -114,7 +129,7 @@ function change_verify_code(array $actor, string $purpose, string $input): void
     }
 
     $stmt = $pdo->prepare(
-        'SELECT id, code_hash, attempts, (expires_at < NOW()) AS is_expired
+        'SELECT id, code_hash, (expires_at < NOW()) AS is_expired
            FROM change_codes
           WHERE actor_type = ? AND actor_id = ? AND purpose = ? AND consumed_at IS NULL
           ORDER BY id DESC LIMIT 1'
@@ -130,20 +145,11 @@ function change_verify_code(array $actor, string $purpose, string $input): void
         change_codes_clear($pdo, $actor['type'], $actor['id'], $purpose);
         throw new ApiError('That code has expired. Request a new one.');
     }
-    if ((int) $row['attempts'] >= mfa_max_attempts()) {
-        change_codes_clear($pdo, $actor['type'], $actor['id'], $purpose);
-        throw new ApiError('Too many wrong codes. Request a new one.');
-    }
 
+    // A wrong entry never counts against the code and never retires it — only a
+    // correct one consumes it, and the resend cooldown limits replacements.
     if (!hash_equals((string) $row['code_hash'], mfa_hash_code($input, (string) $account['secret']))) {
-        $pdo->prepare('UPDATE change_codes SET attempts = attempts + 1 WHERE id = ?')
-            ->execute([(int) $row['id']]);
-        $left = mfa_max_attempts() - ((int) $row['attempts'] + 1);
-        throw new ApiError(
-            $left > 0
-                ? 'That code is not correct. ' . $left . ' ' . ($left === 1 ? 'attempt' : 'attempts') . ' left.'
-                : 'Too many wrong codes. Request a new one.'
-        );
+        throw new ApiError('That code is not correct. Check your email and try again.');
     }
 
     // Single use: gone the moment it has authorised one change.
