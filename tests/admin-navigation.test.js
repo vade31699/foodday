@@ -373,6 +373,27 @@ test("the admin drawer is positioned against the phone frame, not the window", (
   assert.match(frame, /position:relative/, "the frame is the containing block it is placed against");
 });
 
+test("the bottom nav is hidden until a signed-in screen asks for it", () => {
+  // It used to default to flex, and navigateTo() was the only thing that ever
+  // hid it. Nobody is signed in on a first load, so the bar sat across the
+  // splash, the onboarding and the sign-in screens.
+  // The bar's own rule shares a line with .bottom-nav button{display:flex}, so
+  // read just the first block, up to its closing brace.
+  const at = stylesCss.indexOf(".bottom-nav{");
+  assert.notEqual(at, -1, "the bottom nav rule is still declared");
+  const rest = stylesCss.slice(at);
+  const block = rest.slice(0, rest.indexOf("}") + 1);
+  assert.match(block, /display:none/, "it starts hidden");
+  assert.doesNotMatch(block, /display:flex/, "nothing can show it before navigateTo decides");
+
+  const appJs = fs.readFileSync(APP_JS, "utf8");
+  assert.match(
+    appJs,
+    /style\.display = USER_SCREENS\.includes\(id\) \? "flex" : "none"/,
+    "navigateTo turns it on only for a signed-in customer screen"
+  );
+});
+
 test("the Back button is sized to sit beside the search box", () => {
   assert.match(stylesCss, /\.order-toolbar\{[^}]*display:flex/, "the toolbar lays the two out in a row");
   assert.match(stylesCss, /\.toolbar-back\{[^}]*height:41px/, "the button matches the search box's height");
