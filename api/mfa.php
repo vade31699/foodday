@@ -279,11 +279,22 @@ function mfa_send_code(string $to, string $name, string $code, string $purpose):
  * --------------------------------------------------------------- */
 
 /**
- * Sends the enrolment code. Refuses when mail is unusable — enabling MFA you
- * can never complete would lock the account out of its own dashboard.
+ * Sends the enrolment code. The account password must be re-entered first, so a
+ * walked-up-to or borrowed session cannot start switching the second factor on.
+ * Refuses when mail is unusable — enabling MFA you can never complete would lock
+ * the account out of its own dashboard.
  */
-function mfa_start_enrollment(array $actor): array
+function mfa_start_enrollment(array $actor, string $password): array
 {
+    $pdo = db();
+
+    $table = $actor['type'] === 'admin' ? 'admins' : 'users';
+    $stmt = $pdo->prepare("SELECT password FROM `$table` WHERE id = ?");
+    $stmt->execute([$actor['id']]);
+    if (!password_matches($password, (string) $stmt->fetchColumn())) {
+        throw new ApiError('Please enter your current password to turn two-factor sign-in on.');
+    }
+
     if (mail_configured_failure() !== '') {
         throw new ApiError(
             'Two-factor sign-in cannot be switched on yet. ' . mail_configured_failure(),
@@ -291,7 +302,6 @@ function mfa_start_enrollment(array $actor): array
         );
     }
 
-    $pdo = db();
     $account = mfa_account($pdo, $actor['type'], $actor['id']);
     if ($account === null) {
         throw new ApiError('Account not found.', 404);

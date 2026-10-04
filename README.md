@@ -491,6 +491,11 @@ matter of taste rather than a matter of security.
   fresh code can be requested only once the current one is at least
   `CODE_RESEND_COOLDOWN_MINUTES` (3 by default) old, which is what limits
   resend spam. The cooldown is shared by two-factor, sign-up and change codes.
+- **Turning two-factor on asks for your password first.** `mfa_start_enrollment`
+  re-checks the account's current password before it emails any setup code, so a
+  walked-up-to or borrowed session cannot begin switching the second factor on.
+  The same rule covers the customer and the admin; the setup code is single-use
+  and cannot be replaced until the shared resend cooldown has passed.
 - **Every password field has a show/hide eye.** The field and its eye share one
   wrapper (`.pw-field`), and the eye carries an accessible label that flips
   between "Show password" and "Hide password" (`togglePasswordVisibility`).
@@ -595,6 +600,15 @@ cooldown defaults to three minutes and is clamped, each request path
 (two-factor, sign-up, change) calls the cooldown, none of the verification
 paths increments an attempts counter, and every code is still consumed on use.
 
+**`mfa-enroll-password.test.js`** pins the password gate in front of a two-factor
+setup code. At the source level it checks that `mfa_start_enrollment` takes the
+current password, verifies it before any code is sent, and is handed the
+password by both `account.php` and `admin.php`; it also checks the shared resend
+cooldown still limits replacing the code. It then renders the modal through the
+real `app.js` to show that the off state leads to a password step (not straight
+to a code), that the step carries a show/hide eye and the masked address, and
+that a resend reuses the password already entered.
+
 **`password-eye.test.js`** checks that every `type="password"` input in
 `index.html` sits in a `.pw-field` with exactly one labelled eye, that the
 dynamically rendered two-factor password has one too, and that
@@ -634,6 +648,7 @@ tests/
   signup-verify.test.js         the emailed sign-up confirmation
   password-eye.test.js          the show/hide eye on every password field
   email-code.test.php           the no-space, single-use, 3-minute code policy
+  mfa-enroll-password.test.js   the password gate before a two-factor code
 ```
 
 ## Structure

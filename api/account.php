@@ -50,7 +50,7 @@ switch ($action) {
 
     case 'mfa_start':
         $actor = mfa_actor_user($user);
-        ok(['mfa' => array_merge(mfa_status_payload($actor), mfa_start_enrollment($actor))]);
+        ok(['mfa' => array_merge(mfa_status_payload($actor), mfa_start_enrollment($actor, (string) ($data['password'] ?? '')))]);
         break;
 
     case 'mfa_confirm':

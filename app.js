@@ -646,12 +646,16 @@ function securityOpenMfa() { openMfaModal(securityWho); }
  * view. Rendering is always done from a value we hold, never from the DOM.
  */
 let mfaWho = "user", mfaState = "status", mfaRecovery = null, mfaLogin = null, mfaReauth = false;
+/* Held only while an enrolment is in progress, so "Send a new one" can resend
+   without asking for the password again. Cleared when the flow ends. */
+let mfaEnablePass = "";
 
 function mfaApi(who) { return who === "admin" ? "admin.php" : "account.php"; }
 function mfaIsAdmin(who) { return who === "admin"; }
 
 function mfaTitle() {
   if (mfaState === "login") return "Verify it's you";
+  if (mfaState === "password") return "Confirm it's you";
   if (mfaState === "setup") return mfaWho === "admin" ? "Confirm your code" : "Confirm your code";
   if (mfaState === "codes") return "Save your recovery codes";
   if (mfaState === "disable") return "Turn off two-factor";
@@ -660,6 +664,7 @@ function mfaTitle() {
 
 function mfaBack() {
   if (mfaState === "login") { closeModal("modal-mfa"); mfaLogin = null; return; }
+  if (mfaState === "password") { mfaEnablePass = ""; mfaState = "status"; openMfaModal(mfaWho); return; }
   if (mfaState === "setup" || mfaState === "codes" || mfaState === "disable") { mfaState = "status"; openMfaModal(mfaWho); return; }
   closeModal("modal-mfa");
 }
@@ -682,12 +687,24 @@ function mfaStatusView(s) {
     blocks.push(`<p class="mfa-hint">Recovery codes left: <b>${Number(s.recovery_left || 0)}</b>. Each one signs you in once if your email is unreachable.</p>`);
     blocks.push(`<button class="btn btn-ghost" onclick="mfaGo('disable')">Turn Off Two-Factor</button>`);
   } else {
-    blocks.push(`<button class="btn btn-primary" onclick="mfaStartEnable()">Turn On Two-Factor</button>`);
+    blocks.push(`<button class="btn btn-primary" onclick="mfaGo('password')">Turn On Two-Factor</button>`);
     if (!mailOk) {
       blocks.push(`<p class="mfa-hint warn">⚠ ${esc(s.mail_problem || "Email delivery is not set up yet, so codes could not be sent.")}</p>`);
     }
   }
   return blocks.join("");
+}
+
+/**
+ * The step before a code is sent: the account password must be re-entered, so
+ * enabling the second factor cannot happen from a session someone walked up to.
+ */
+function mfaPasswordView(s) {
+  return `<p>Enter your current password. We'll then email a 6-digit code to <b>${esc(mfaMaskedEmail(s))}</b> to finish turning on two-factor.</p>
+    <div class="form-stack"><label>Your password</label>
+      <span class="pw-field"><input id="mfa-enable-pass" class="input" type="password" autocomplete="current-password" placeholder="Enter your password"><button type="button" class="pw-eye" onclick="togglePasswordVisibility('mfa-enable-pass', this)" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.6"></circle><path class="pw-eye-slash" d="M4 4l16 16"></path></svg></button></span>
+    </div>
+    <button class="btn btn-primary" onclick="mfaStartEnable()">Send Code</button>`;
 }
 
 function mfaSetupView(s) {
@@ -746,8 +763,12 @@ function mfaRender() {
   const body = document.getElementById("mfa-body");
   if (!body) return;
   document.getElementById("mfa-title").textContent = mfaTitle();
-  const view = mfaLogin ? "login" : mfaState;
-  if (view === "login") body.innerHTML = mfaLoginView(mfaLogin);
+  // The state decides the view; mfaLogin only carries the payload (the status
+  // for the settings flow, the challenge for a sign-in). Treating any set
+  // mfaLogin as "login" showed the challenge on the settings screen too.
+  const view = mfaState;
+  if (view === "login") body.innerHTML = mfaLoginView(mfaLogin || {});
+  else if (view === "password") body.innerHTML = mfaPasswordView(mfaLogin || {});
   else if (view === "setup") body.innerHTML = mfaSetupView(mfaLogin || {});
   else if (view === "codes") body.innerHTML = mfaCodesView(mfaRecovery || []);
   else if (view === "disable") body.innerHTML = mfaDisableView();
@@ -764,7 +785,7 @@ async function mfaLoadStatus(who) {
 }
 
 async function openMfaModal(who) {
-  mfaWho = who; mfaState = "status"; mfaLogin = null; mfaRecovery = null;
+  mfaWho = who; mfaState = "status"; mfaLogin = null; mfaRecovery = null; mfaEnablePass = "";
   mfaRender();
   openModal("modal-mfa");
   await mfaLoadStatus(who);
@@ -787,12 +808,18 @@ async function mfaRefreshSummaries() {
 }
 
 async function mfaStartEnable() {
+  // The password is read from the field on the password step, or reused from
+  // the one just entered when "Send a new one" is tapped on the setup step.
+  const passInput = document.getElementById("mfa-enable-pass");
+  const pass = passInput ? (passInput.value || "") : mfaEnablePass;
+  if (!pass) { showAlert("Enter your current password to continue.", "Two-Factor Authentication"); return; }
   try {
-    const res = await api(mfaApi(mfaWho), { action: "mfa_start" });
+    const res = await api(mfaApi(mfaWho), { action: "mfa_start", password: pass });
+    mfaEnablePass = pass;
     mfaLogin = res.mfa;
     mfaState = "setup";
     mfaRender();
-  } catch (e) { reportError(e); }
+  } catch (e) { mfaEnablePass = ""; reportError(e); }
 }
 
 async function mfaConfirmEnable() {
@@ -812,7 +839,7 @@ async function mfaConfirmEnable() {
 
 function mfaFinishCodes() {
   const mustReauth = mfaReauth;
-  mfaRecovery = null; mfaReauth = false; mfaState = "status";
+  mfaRecovery = null; mfaReauth = false; mfaEnablePass = ""; mfaState = "status";
   if (mustReauth) {
     closeModal("modal-mfa");
     showInfo("Two-Factor Is On", "For your security, every session was signed out when two-factor was turned on — including this one. Sign in with your password and the new emailed code.");
@@ -1213,7 +1240,7 @@ async function handleSignIn() {
       document.getElementById("login-pass").value = "";
       mfaWho = res.admin ? "admin" : "user";
       mfaLogin = res.mfa;
-      mfaState = "status";
+      mfaState = "login";
       mfaRender();
       openModal("modal-mfa");
       return;
