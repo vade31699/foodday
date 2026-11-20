@@ -1,0 +1,79 @@
+# FOODAY — Render Blueprint.
+#
+# Deploy with "New +" > "Blueprint", pick this repository, and Render builds the
+# bundled Dockerfile (PHP 8.3 + Apache, document root public/) as a web service.
+# It asks for every value marked `sync: false` before the first deploy, so no
+# secret is ever committed: .env is in .dockerignore, and the front controller
+# would not serve it even if it were in the image.
+#
+# Render has no MySQL, so DATABASE_URL must point at an external MySQL (see
+# README > TiDB Cloud). An existing database — the TiDB Cloud instance in
+# ap-southeast-1 is already at schema v10 — needs no import: api/migrations.php
+# upgrades it in place on the first request. Only a brand-new one needs
+# fooday.sql once.
+
+services:
+  - type: web
+    name: fooday
+    runtime: docker
+    plan: free
+    # Same region as the TiDB Cloud instance (ap-southeast-1), so every query
+    # is one short hop instead of a round trip across the Pacific.
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # The app shell is static HTML, so this checks the container is up without
+    # touching the database.
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # --- Database -------------------------------------------------------
+      # Paste the TiDB Cloud connection string:
+      #   mysql://<prefix>.root:<password>@gateway01.<region>.prod.aws.tidbcloud.com:4000/fooday_db?ssl-mode=REQUIRED
+      # It carries the host, port 4000, user and database, so one value is
+      # enough. The five DB_* variables (DB_HOST, DB_PORT, DB_DATABASE,
+      # DB_USERNAME, DB_PASSWORD) also work and win when both are set — use
+      # them instead if the password is awkward to percent-encode.
+      - key: DATABASE_URL
+        sync: false
+      # TiDB Cloud accepts TLS only. verify_identity checks the certificate and
+      # hostname against the CA bundle the Linux image already ships, so no
+      # DB_SSL_CA is needed — and a Windows path copied from a local .env must
+      # not be set here, because that file does not exist in the container.
+      # Fall back to `required` (encrypted, unverified) only for an instance
+      # whose certificate is not publicly trusted.
+      - key: DB_SSL_MODE
+        value: verify_identity
+
+      # --- Mail -----------------------------------------------------------
+      # Free instances block outbound SMTP (25, 465, 587), and sign-up needs an
+      # emailed code, so a free service cannot register customers. Use a paid
+      # instance, or set MAIL_DRIVER=none knowing nobody can sign up.
+      - key: MAIL_DRIVER
+        value: smtp
+      - key: MAIL_FROM_NAME
+        value: FOODAY
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_SMTP_HOST
+        value: smtp.gmail.com
+      - key: MAIL_SMTP_PORT
+        value: "465"
+      - key: MAIL_SMTP_IMPLICIT_TLS
+        value: "true"
+      - key: MAIL_SMTP_USER
+        sync: false
+      - key: MAIL_SMTP_PASS
+        sync: false
+      - key: MAIL_SMTP_TIMEOUT
+        value: "15"
+      - key: MAIL_SMTP_VERIFY_PEER
+        value: "true"
+
+      # --- One-time codes -------------------------------------------------
+      - key: MFA_CODE_TTL_MINUTES
+        value: "10"
+      - key: CODE_RESEND_COOLDOWN_MINUTES
+        value: "3"
+      - key: MFA_PEPPER
+        sync: false

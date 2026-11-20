@@ -219,15 +219,41 @@ be found.
 
 Render has no native PHP runtime, so this repo ships a `Dockerfile` that runs
 PHP 8.3 under Apache with the document root at `public/` — the same allow-list
-front controller Laravel Cloud uses. Create a **Web Service** from the repo:
+front controller Laravel Cloud uses.
 
-1. **Language:** Docker. Leave *Build Command* and *Start Command* empty (the
-dashboard hides them once Docker is selected; it pre-fills `yarn` / `yarn start`
-for a Node.js service, which this app is not). *Root Directory* stays blank.
+1. **Deploy the blueprint.** `render.yaml` describes the whole service, so
+   **New + > Blueprint** and picking this repository is enough: Render builds
+   the `Dockerfile` and asks for the values marked `sync: false` (the database,
+   the SMTP password, `MFA_PEPPER`) before the first deploy. To create it by
+   hand instead, choose **Web Service** with **Language: Docker**, and leave
+   *Build Command* and *Start Command* empty (the dashboard hides them once
+   Docker is selected; it pre-fills `yarn` / `yarn start` for a Node.js
+   service, which this app is not). *Root Directory* stays blank either way.
+   What the container already handles for you:
+
+   - `docker/php.ini` puts PHP in production mode — errors go to the log
+     instead of into JSON responses, `X-Powered-By` is dropped, and
+     `post_max_size` / `upload_max_filesize` leave room for the app's own 2 MB
+     and 4 MB photo ceilings (a 4 MB image arrives base64-encoded, about a
+     third larger on the wire).
+   - Apache's access and error logs are linked to stdout/stderr, so Render's
+     log stream shows requests and `error_log()` lines.
+   - The health check is `/`, which is the static app shell and never touches
+     the database.
+
 2. **Database:** Render offers PostgreSQL only, and FOODAY needs MySQL. Point
-   `DATABASE_URL` at an external MySQL such as [TiDB Cloud](#tidb-cloud), and
-   import `fooday.sql` there before the first request (it is destructive — see
-   [Setup](#setup)). `api/migrations.php` upgrades it afterwards.
+   `DATABASE_URL` at the MySQL you already run — the [TiDB Cloud](#tidb-cloud)
+   instance from Setup works unchanged — and keep the `?ssl-mode=REQUIRED` the
+   console hands out. An existing database needs no import: `api/migrations.php`
+   upgrades it in place on the first request. Only a brand-new one needs
+   `fooday.sql` once (it is destructive — see [Setup](#setup)).
+
+   Paste the URL exactly as issued, and do **not** copy `DB_SSL_CA` out of a
+   local `.env`: a Windows path such as `C:/certs/isrgrootx1.pem` does not exist
+   in the container. The Linux image ships the CA bundle, so `DB_SSL_MODE`
+   alone is enough — `verify_identity` (the blueprint's default) checks the
+   certificate and hostname against it, and `required` encrypts without
+   verifying if your instance uses a certificate the bundle does not know.
 3. **Environment:** set `DB_*` (or the single `DATABASE_URL`) and `MAIL_*` plus
    `MFA_PEPPER` from `.env.example` in the dashboard. Do not upload `.env`.
 4. **Mail:** free web services block outbound SMTP ports 25, 465 and 587, and
