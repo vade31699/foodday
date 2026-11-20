@@ -19,6 +19,16 @@ COPY docker/php.ini /usr/local/etc/php/conf.d/fooday.ini
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 COPY . /var/www/html
 
+# Digital Asset Links and the PWA icons are fetched by Android and by the
+# browser's install flow, and both sit in a directory that does not exist under
+# the document root. Apache's fallback handler only fires for a missing file
+# whose parent directory exists, so these two paths 404/403 instead of reaching
+# the front controller. Copying them next to index.php makes them real files
+# that Apache serves directly, whatever the fallback does.
+RUN mkdir -p /var/www/html/public/.well-known /var/www/html/public/icons \
+    && cp /var/www/html/.well-known/assetlinks.json /var/www/html/public/.well-known/ \
+    && cp /var/www/html/icons/*.png /var/www/html/public/icons/
+
 # Render shows the container's stdout and stderr in its log stream, while
 # Apache writes to files by default. Pointing both at the container's streams
 # means requests and error_log() lines are visible in the dashboard instead of

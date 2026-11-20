@@ -28,6 +28,15 @@ Options -Indexes
     </FilesMatch>
 </IfModule>
 
+# Digital Asset Links has to stay reachable. Android fetches
+# /.well-known/assetlinks.json to prove the installed app may open this site,
+# and the blanket ".json" rule above would otherwise answer 403 — which
+# silently demotes the app to a browser tab with a URL bar. This sits after
+# the deny so it wins for this one file.
+<Files "assetlinks.json">
+    Require all granted
+</Files>
+
 # Hidden directories (.git, .freebuff) and tests/, when mod_rewrite is
 # available. The rule above already blocks the files themselves even if
 # mod_rewrite is switched off. .well-known is left alone so certificate
