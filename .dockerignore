@@ -1,0 +1,14 @@
+# Secrets: real environment variables are set in the Render dashboard instead.
+.env
+.env.*
+!.env.example
+
+# Not needed to serve the app, and large.
+.git
+.gitignore
+.freebuff
+twa
+tests
+node_modules
+vendor
+*.log

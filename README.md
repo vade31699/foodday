@@ -215,6 +215,33 @@ be found.
    root `index.php` delegates to the same controller, so both layouts serve
    the identical, restricted set of files.
 
+### Render
+
+Render has no native PHP runtime, so this repo ships a `Dockerfile` that runs
+PHP 8.3 under Apache with the document root at `public/` — the same allow-list
+front controller Laravel Cloud uses. Create a **Web Service** from the repo:
+
+1. **Language:** Docker. Leave *Build Command* and *Start Command* empty (the
+dashboard hides them once Docker is selected; it pre-fills `yarn` / `yarn start`
+for a Node.js service, which this app is not). *Root Directory* stays blank.
+2. **Database:** Render offers PostgreSQL only, and FOODAY needs MySQL. Point
+   `DATABASE_URL` at an external MySQL such as [TiDB Cloud](#tidb-cloud), and
+   import `fooday.sql` there before the first request (it is destructive — see
+   [Setup](#setup)). `api/migrations.php` upgrades it afterwards.
+3. **Environment:** set `DB_*` (or the single `DATABASE_URL`) and `MAIL_*` plus
+   `MFA_PEPPER` from `.env.example` in the dashboard. Do not upload `.env`.
+4. **Mail:** free web services block outbound SMTP ports 25, 465 and 587, and
+   sign-up does not complete without an emailed code. Use a paid instance (the
+   block is lifted there), or set `MAIL_DRIVER=none` knowing nobody can
+   register.
+5. **Storage:** photos are stored in MySQL, so no persistent disk is needed.
+   Sessions live in the container, so a free instance spinning down signs
+   everyone out.
+
+The container listens on Render's `PORT` (10000 by default) and serves nothing
+outside the front controller's allow-list, so `.env`, `fooday.sql`,
+`README.md` and `tests/` stay unreachable.
+
 ## Accounts
 
 - **Customer:** create an account on the "Create Account" screen. A delivery
